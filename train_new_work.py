@@ -8,6 +8,7 @@ from alphagen_qlib.stock_data import StockData
 from alphagen.data.tree import ExpressionParser
 import argparse
 import os
+import torch
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -52,14 +53,18 @@ INITIAL_EXPR = [
 
 def train(args):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.cuda)
+    # Resolved after CUDA_VISIBLE_DEVICES is set: checking CUDA earlier would pin the visible devices.
+    if args.device is None:
+        args.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     # Read QLIB_PATH from environment variables
     if args.instruments == 'sp500':
         QLIB_PATH = os.getenv('QLIB_PATH_SP500', 'PATH/TO/data/qlib_data/us_data_qlib')
     else:
         QLIB_PATH = os.getenv('QLIB_PATH_CN', 'PATH/TO/.qlib/qlib_data/cn_data')
     # Initialize StockData and target expression
-    data = StockData(instrument=args.instruments, start_time='2014-01-01', end_time='2020-12-31', qlib_path=QLIB_PATH)
-    data_test = StockData(instrument=args.instruments, start_time='2022-07-01', end_time='2025-06-30', qlib_path=QLIB_PATH)
+    device = torch.device(args.device)
+    data = StockData(instrument=args.instruments, start_time='2014-01-01', end_time='2020-12-31', qlib_path=QLIB_PATH, device=device)
+    data_test = StockData(instrument=args.instruments, start_time='2022-07-01', end_time='2025-06-30', qlib_path=QLIB_PATH, device=device)
     close = Feature(FeatureType.CLOSE)
     target = Ref(close, -20) / close - 1
     # expression_parser = ExpressionParser()
@@ -75,7 +80,7 @@ def train(args):
         use_semantic_similarity=args.use_semantic_similarity,
         use_edit_distance=args.use_edit_distance,
         separate_leaf_non_leaf=args.separate_leaf_non_leaf,
-        device = "cuda:0"
+        device = args.device
     )
     trainer = AlphaKnowledgeTrainer(pool = pool, initial_expressions= INITIAL_EXPR, test_data= data_test, target= target, args=args)
     trainer.train(args)
@@ -83,7 +88,9 @@ def train(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--cuda', type=int, default=1)
+    parser.add_argument('--cuda', type=int, default=0, help='GPU index exposed through CUDA_VISIBLE_DEVICES.')
+    parser.add_argument('--device', type=str, default=None,
+                        help="Torch device for data, factor evaluation and the embedding model, e.g. 'cuda:0' or 'cpu'. Default: cuda:0 when available, else cpu.")
     parser.add_argument('--instruments', type=str, default='csi300')
     parser.add_argument('--temp', type=float, default=0.5)
     parser.add_argument('--pool_capacity', type=int, default=50)
@@ -93,7 +100,7 @@ if __name__ == '__main__':
     parser.add_argument('--generate_num', type=int, default=5)
     parser.add_argument('--top_k', type=int, default= 15)
     parser.add_argument("--depth_decay", type=float, default=0.05)
-    parser.add_argument("--embedding_model_name", type=str, default=os.getenv("EMBEDDING_MODEL_NAME", "xxx"))
+    parser.add_argument("--embedding_model_name", type=str, default=os.getenv("EMBEDDING_MODEL_NAME", "Qwen/Qwen3-Embedding-4B"))
     parser.add_argument("--use_res_correlation", type=bool, default=True)
     parser.add_argument("--use_semantic_similarity", type=bool, default=True)
     parser.add_argument("--use_edit_distance", type=bool, default=False)

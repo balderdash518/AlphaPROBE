@@ -2,6 +2,8 @@ import backoff  # for exponential backoff
 import openai
 import json
 import asyncio
+import re
+import time
 from typing import Any
 from retrying import retry
 
@@ -44,16 +46,65 @@ async def dispatch_openai_chat_requests(
     return await asyncio.gather(*async_responses)
 
 
+THINK_PATTERN = re.compile(r"<think>([\s\S]*?)(?:</think>|$)")
+
+
+def split_thinking(text: str) -> tuple[str, str]:
+    """Split Qwen3-style <think>...</think> blocks out of the answer text."""
+    reasoning = "\n".join(m.strip() for m in THINK_PATTERN.findall(text))
+    # Some servers drop the opening <think> tag and only emit the closing one.
+    if not reasoning and "</think>" in text:
+        reasoning, text = text.split("</think>", 1)
+    return THINK_PATTERN.sub("", text).strip(), reasoning.strip()
+
+
+def usage_details(usage) -> dict[str, int]:
+    """Langfuse usage buckets from a chat.completions usage object."""
+    if usage is None:
+        return {}
+    details = {"input": usage.prompt_tokens or 0, "output": usage.completion_tokens or 0}
+    reasoning = getattr(getattr(usage, "completion_tokens_details", None), "reasoning_tokens", None)
+    if reasoning:
+        details["output_reasoning"] = reasoning
+    return details
+
+
 class OpenAIModel:
-    def __init__(self, model_name, stop_words, max_new_tokens) -> None:
+    def __init__(self, model_name, stop_words, max_new_tokens, max_tokens=None, stream=False) -> None:
         self.model_name = model_name
         self.stop_words = stop_words
         self.max_new_tokens = max_new_tokens
+        # Sent with chat_generate only when set; None keeps the server default.
+        self.max_tokens = max_tokens
+        self.stream = stream
+        self.last_call: dict[str, Any] = {}
+
+    def _stream_completion(self, client, **kwargs):
+        stream = completions_with_backoff(client, stream=True, stream_options={"include_usage": True}, **kwargs)
+        content, reasoning, finish_reason, usage = [], [], None, None
+        for chunk in stream:
+            if chunk.usage is not None:
+                usage = chunk.usage
+            if not chunk.choices:
+                continue
+            choice = chunk.choices[0]
+            delta = choice.delta
+            if delta is not None:
+                if delta.content:
+                    content.append(delta.content)
+                extra = getattr(delta, "reasoning_content", None)
+                if extra:
+                    reasoning.append(extra)
+            if choice.finish_reason:
+                finish_reason = choice.finish_reason
+        if finish_reason is None:
+            # The connection closed before the answer finished; let @retry try again.
+            raise RuntimeError("LLM stream ended without finish_reason")
+        return "".join(content), "".join(reasoning), finish_reason, usage
 
     @retry(stop_max_attempt_number=10, wait_fixed=2000)
     def chat_generate(self, client, system_prompt:str, user_prompt:str, temperature = 0.0):
-        response = completions_with_backoff(
-                client,
+        kwargs = dict(
                 model = self.model_name,
                 messages=[
                         {"role": "system", "content": system_prompt},
@@ -61,10 +112,28 @@ class OpenAIModel:
                     ],
                 temperature = temperature,
                 top_p = 1,
-                stop = self.stop_words
         )
-        generated_text = response.choices[0].message.content.strip()
-        finish_reason = response.choices[0].finish_reason
+        if self.stop_words:
+            kwargs["stop"] = self.stop_words
+        if self.max_tokens:
+            kwargs["max_tokens"] = self.max_tokens
+        started = time.perf_counter()
+        if self.stream:
+            raw_text, reasoning, finish_reason, usage = self._stream_completion(client, **kwargs)
+        else:
+            response = completions_with_backoff(client, **kwargs)
+            message = response.choices[0].message
+            raw_text = message.content or ""
+            reasoning = getattr(message, "reasoning_content", None) or ""
+            finish_reason = response.choices[0].finish_reason
+            usage = response.usage
+        generated_text, inline_reasoning = split_thinking(raw_text)
+        self.last_call = {
+            "reasoning": "\n".join(r for r in (reasoning.strip(), inline_reasoning) if r),
+            "finish_reason": finish_reason,
+            "usage_details": usage_details(usage),
+            "latency_s": round(time.perf_counter() - started, 2),
+        }
         return generated_text, finish_reason
 
     def generate(self, client, input_string, temperature = 0.0):

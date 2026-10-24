@@ -43,7 +43,8 @@ class AlphaKnowledgePool(AlphaPool):
 
         self.use_res_correlation = use_res_correlation
         if use_semantic_similarity:
-            self.embedding_model = SentenceTransformer(embedding_model_name, model_kwargs={"device_map": device},
+            # device= instead of model_kwargs device_map, which needs the accelerate package.
+            self.embedding_model = SentenceTransformer(embedding_model_name, device=device,
     tokenizer_kwargs={"padding_side": "left"})
             self.use_semantic_similarity = use_semantic_similarity
         else:

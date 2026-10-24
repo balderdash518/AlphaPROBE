@@ -15,10 +15,12 @@ from typing import List, Tuple, Optional, Set, Any
 from openai import OpenAI
 from utils.llm import OpenAIModel
 from utils.prompt import *
+from utils.tracing import RunTracer
 from tqdm import tqdm
 from alphagen.data.dimension import DimensionCalculator, _is_close
 
 import re
+import time
 
 
 
@@ -268,14 +270,15 @@ class AlphaKnowledgeLogger:
         self.log_dir = log_dir
         self.args = args
     
-    def load_test_res(self, pool: AlphaKnowledgePool, file: Any) -> None:
+    def load_test_res(self, pool: AlphaKnowledgePool, file: Any) -> dict:
         state = pool.state
         exprs = state.get('exprs', [])
         os.environ["CUDA_VISIBLE_DEVICES"] = str(self.args.cuda)
         if self.args.instruments == 'sp500':
-            QLIB_PATH = 'PATH/TO/data/qlib_data/us_data_qlib'
+            QLIB_PATH = os.getenv('QLIB_PATH_SP500', 'PATH/TO/data/qlib_data/us_data_qlib')
         else:
-            QLIB_PATH = 'PATH/TO/.qlib/qlib_data/cn_data'
+            QLIB_PATH = os.getenv('QLIB_PATH_CN', 'PATH/TO/.qlib/qlib_data/cn_data')
+        device = torch.device(self.args.device)
         close = exp_module.Feature(exp_module.FeatureType.CLOSE)
         target = exp_module.Ref(close, - 20) / close - 1
         train_end_time = f'2020-12-31'
@@ -283,9 +286,9 @@ class AlphaKnowledgeLogger:
         valid_end_time = f'2022-06-30'
         test_start_time = f'2022-07-01'
         test_end_time = f'2025-06-30'
-        data_all = StockData(instrument=self.args.instruments, start_time='2010-01-01', end_time=test_end_time, qlib_path=QLIB_PATH)
-        data_valid = StockData(instrument=self.args.instruments, start_time=valid_start_time, end_time=valid_end_time, qlib_path=QLIB_PATH)
-        data_test = StockData(instrument=self.args.instruments, start_time=test_start_time, end_time=test_end_time, qlib_path=QLIB_PATH)
+        data_all = StockData(instrument=self.args.instruments, start_time='2010-01-01', end_time=test_end_time, qlib_path=QLIB_PATH, device=device)
+        data_valid = StockData(instrument=self.args.instruments, start_time=valid_start_time, end_time=valid_end_time, qlib_path=QLIB_PATH, device=device)
+        data_test = StockData(instrument=self.args.instruments, start_time=test_start_time, end_time=test_end_time, qlib_path=QLIB_PATH, device=device)
         
         fct_tensor = exprs2tensor(exprs, data_all, normalize=True)
         tgt_tensor = exprs2tensor([target], data_all, normalize=False)
@@ -407,8 +410,8 @@ class AlphaKnowledgeLogger:
         tgt_test = tgt_tensor[start_day + data_valid.n_days :, :, 0]
         
         # Calculate metrics
-        valid_results, _ = get_tensor_metrics(pred_valid.cuda(), tgt_valid.cuda(), 0, self.args)
-        test_results, ret_s = get_tensor_metrics(pred_test.cuda(), tgt_test.cuda(), 0, self.args)
+        valid_results, _ = get_tensor_metrics(pred_valid.to(device), tgt_valid.to(device), 0, self.args)
+        test_results, ret_s = get_tensor_metrics(pred_test.to(device), tgt_test.to(device), 0, self.args)
         ret_s = ret_s.cpu().numpy()
         # Format and print results
         results_df = pd.DataFrame([valid_results, test_results], index=['Validation', 'Test'])
@@ -427,8 +430,9 @@ class AlphaKnowledgeLogger:
             file.write(f"{index:<12} {row['ic']:>8.4f} {row['ic_std']:>8.4f} {row['icir']:>8.4f} {row['ric']:>8.4f} {row['ric_std']:>8.4f} {row['ricir']:>8.4f} {row['ret']:>8.4f} {row['ret_std']:>8.4f} {row['retir']:>8.4f} {row['ret_sharpe']:>8.4f} {row['ret_mdd']:>8.4f}")
         
         file.write("="*50)
+        return {index: {k: float(v) for k, v in row.items()} for index, row in results_df.iterrows()}
     
-    def log(self, pool: AlphaKnowledgePool, graph: ExpressionKnowledgeGraph, iteration: int):
+    def log(self, pool: AlphaKnowledgePool, graph: ExpressionKnowledgeGraph, iteration: int) -> dict:
         print(f"=== Logging at iteration {iteration} ===")
         pool_path = os.path.join(self.log_dir, f'pool_{iteration}.json')
         with open(pool_path, 'w') as f:
@@ -438,6 +442,7 @@ class AlphaKnowledgeLogger:
         target_test = pool._normalize_by_day(self.target.evaluate(self.test_data))
         n = len(exprs)
         print('---------------------------------------------')
+        alphas = []
         for i in range(n):
             expr = state['exprs'][i]
             expr_str = str(expr)
@@ -459,11 +464,13 @@ class AlphaKnowledgeLogger:
                     node.test_icir = icir_test_abs
 
             print(f'> Alpha #{i}: ic={ic_ret:.4f}, test_ic={ic_test:.4f}, test_icir={icir_test:.4f}, expr={expr_str}')
+            alphas.append({"expression": expr_str, "ic": float(ic_ret), "test_ic": float(ic_test), "test_icir": float(icir_test)})
         if pool.size > 0:
             print(f'>> Best single ic: {np.max(pool.single_ics[:pool.size]):.4f}')
         print('---------------------------------------------')
         with open(os.path.join(self.log_dir, f'res.txt'), 'a+') as f:
-            self.load_test_res(pool, f)
+            combination = self.load_test_res(pool, f)
+        return {"iteration": iteration, "alphas": alphas, "combination": combination}
 
 
 
@@ -491,25 +498,38 @@ class AlphaKnowledgeTrainer:
                     node = self.graph.search(expr.strip())
                     # if node is not None:
                     #     self.pool.register_expression_node(node)
-        ##TODO: set your model name
-        model_name = "your_model_name"
+        model_name = os.getenv("OPENAI_MODEL_NAME", "your_model_name")
         log_dir = os.path.join(
         'data/knowledge_logs',
         f'pool_{args.pool_capacity}',
-        f'kg_dag_and_bayesian_icir_and_mutl_new_no_decay_{model_name}_{args.generate_num}_{args.instruments}_{args.temp}_{args.depth_limit}_{args.max_length}_{args.ic_mut_threshold}_{args.pool_capacity}_{args.search_time}_{args.ic_threshold}_{args.use_res_correlation}_{args.use_semantic_similarity}_{args.use_edit_distance}_{args.separate_leaf_non_leaf}_{args.icir_decay_threshold}_{args.times_decay}_{args.depth_decay}')
+        f'kg_dag_and_bayesian_icir_and_mutl_new_no_decay_{model_name.replace("/", "_")}_{args.generate_num}_{args.instruments}_{args.temp}_{args.depth_limit}_{args.max_length}_{args.ic_mut_threshold}_{args.pool_capacity}_{args.search_time}_{args.ic_threshold}_{args.use_res_correlation}_{args.use_semantic_similarity}_{args.use_edit_distance}_{args.separate_leaf_non_leaf}_{args.icir_decay_threshold}_{args.times_decay}_{args.depth_decay}')
 
         os.makedirs(log_dir, exist_ok=True)
         self.logger = AlphaKnowledgeLogger(test_data, target, log_dir, args)
-        ## TODO: set your api key and base url in environment variables
+        # API key, base url and model name come from .env (see .env.example)
         self.client = OpenAI(
             api_key=os.getenv("OPENAI_API_KEY", ""),
-            base_url=os.getenv("OPENAI_BASE_URL", "")
+            base_url=os.getenv("OPENAI_BASE_URL", ""),
+            timeout=float(os.getenv("LLM_TIMEOUT", "600")),
         )
-        self.model = OpenAIModel(model_name,"", 400000)
-    
+        max_tokens = os.getenv("LLM_MAX_TOKENS")
+        self.model = OpenAIModel(model_name, "", 400000,
+                                 max_tokens=int(max_tokens) if max_tokens else None,
+                                 stream=os.getenv("LLM_STREAM", "false").lower() in ("1", "true", "yes"))
+        run_id = time.strftime("%Y%m%d-%H%M%S")
+        self.tracer = RunTracer(
+            session_id=f"alphaprobe-{args.instruments}-{run_id}",
+            tags=[f"instruments:{args.instruments}", f"model:{model_name}", f"seed:{args.seed}"],
+            metadata={"log_dir": log_dir, "model": model_name, "temp": args.temp,
+                      "generate_num": args.generate_num, "pool_capacity": args.pool_capacity,
+                      "search_time": args.search_time, "ic_threshold": args.ic_threshold,
+                      "ic_new_threshold": args.ic_new_threshold, "top_k": args.top_k},
+        )
+        print(f"Langfuse tracing: {'on' if self.tracer.enabled else 'off'} (session {self.tracer.session_id})")
+
 
 ## qwen3-235b-a22b-thinking-2507 deepseek-r1
-    
+
     def _train_one_iteration(self, step: int, args: Any):
 
         def build_traces(paths: List[ExpressionNode]) -> str:
@@ -522,10 +542,17 @@ class AlphaKnowledgeTrainer:
                     res += " -> "
             # print(f"Built traces: {res} for expression {paths[0].payload.source}")
             return res
-        
-        nodes_to_optimize, exprs_to_optimize = self.pool.search()
+
+        with self.tracer.observe("retrieve-parents", as_type="retriever",
+                                 input={"pool_size": self.pool.size, "top_k": args.top_k}) as retrieval:
+            nodes_to_optimize, exprs_to_optimize = self.pool.search()
+            retrieval.update(output=[
+                None if node is None else {k: v for k, v in node.as_dict().items() if k not in ("tokens", "children")}
+                for node in nodes_to_optimize
+            ])
         nodes_str = [node.payload.source for node in nodes_to_optimize]
         print(f"Step {step}: optimizing {len(nodes_to_optimize)} nodes: {nodes_str}")
+        stats = {"nodes": len(nodes_to_optimize), "candidates": 0, "parse_failures": 0, "inserted": []}
         iter = 0
         for node, parent_expr in tqdm(zip(nodes_to_optimize, exprs_to_optimize), desc=f"optimizing step {step}"):
             if node is None:
@@ -535,45 +562,80 @@ class AlphaKnowledgeTrainer:
             iter += 1
             paths = self.graph.path_to_root(node)
             traces = build_traces(paths)
-            topic = node.topic
-            generation_prompt = PROMPT_FEATURES_AND_OPERATORS + PROMPT_GENERARTION.format(topic=topic, expressions=node.payload.source, traces=traces, num =args.generate_num, explanations = node.description)
-            res, _ = self.model.chat_generate(self.client, system_prompt = PROMPT_HEAD, user_prompt = generation_prompt, temperature = args.temp)
+            with self.tracer.observe("evolve-node", as_type="chain",
+                                     input={"expression": node.payload.source, "topic": node.topic,
+                                            "explanation": node.description, "traces": traces},
+                                     metadata={"depth": node.depth, "times": node.times}) as evolve:
+                outcome = self._evolve_node(node, parent_expr, traces, args)
+                evolve.update(output=outcome)
+            stats["candidates"] += len(outcome["candidates"])
+            stats["parse_failures"] += int(outcome["parse_failed"])
+            stats["inserted"] += [c["expression"] for c in outcome["candidates"] if c["outcome"].startswith("inserted")]
+        return stats
+
+    def _evolve_node(self, node: ExpressionNode, parent_expr: exp_module.Expression, traces: str, args: Any) -> dict:
+        topic = node.topic
+        generation_prompt = PROMPT_FEATURES_AND_OPERATORS + PROMPT_GENERARTION.format(topic=topic, expressions=node.payload.source, traces=traces, num =args.generate_num, explanations = node.description)
+        with self.tracer.generation("generate-offspring", model=self.model.model_name,
+                                    system_prompt=PROMPT_HEAD, user_prompt=generation_prompt,
+                                    model_parameters={"temperature": args.temp, "top_p": 1,
+                                                      "max_tokens": self.model.max_tokens, "stream": self.model.stream}) as generation:
+            res, finish_reason = self.model.chat_generate(self.client, system_prompt = PROMPT_HEAD, user_prompt = generation_prompt, temperature = args.temp)
+            call = self.model.last_call
+            generation.update(output=res, usage_details=call.get("usage_details") or None,
+                              metadata={"finish_reason": finish_reason, "latency_s": call.get("latency_s"),
+                                        "reasoning": call.get("reasoning") or None})
+        result = {"parse_failed": False, "candidates": []}
+        try:
+            # print(res)
+            json_res = json.loads(res)
+            assert len(json_res["expressions_fixed"]) == args.generate_num
+            assert len(json_res["explanations"]) == args.generate_num
+        except (json.JSONDecodeError, AssertionError, KeyError, TypeError) as exc:
+            print(f"Failed to parse JSON response or invalid number of expressions/explanations: {exc}")
+            pattern = re.compile(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```|\{([\s\S]*?)\}',re.MULTILINE)
+            candidate = None
+            for match in pattern.finditer(res):
+                candidate = match.group(1) or f'{{{match.group(2)}}}'
             try:
-                # print(res)
-                json_res = json.loads(res)
-                assert len(json_res["expressions_fixed"]) == args.generate_num
-                assert len(json_res["explanations"]) == args.generate_num
-            except (json.JSONDecodeError, AssertionError) as exc:
-                print(f"Failed to parse JSON response or invalid number of expressions/explanations: {exc}")
-                pattern = re.compile(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```|\{([\s\S]*?)\}',re.MULTILINE)
-                for match in pattern.finditer(res):
-                    candidate = match.group(1) or f'{{{match.group(2)}}}'
-                try:
-                    json_res = json.loads(candidate)
-                except (json.JSONDecodeError, AssertionError) as exc:
-                    print(f"Failed to candidate {candidate}: {exc}")
-                    continue
+                json_res = json.loads(candidate) if candidate is not None else None
+                assert json_res is not None
+                assert len(json_res["expressions"]) >= args.generate_num
+                assert len(json_res["explanations"]) >= args.generate_num
+            except (json.JSONDecodeError, AssertionError, KeyError, TypeError) as exc:
+                print(f"Failed to candidate {candidate}: {exc}")
+                result["parse_failed"] = True
+                return result
+        candidates = result["candidates"]
+        with self.tracer.observe("evaluate-offspring", as_type="evaluator",
+                                 input={"expressions": json_res["expressions"][:args.generate_num]}) as evaluation:
             parent_ic, parent_icir, parent_mut = self.pool.get_ic_icir_mutics(expr=parent_expr)
+            result["parent"] = {"ic": _num(parent_ic), "icir": _num(parent_icir), "max_mut_ic": _max_abs(parent_mut)}
             for i in range(args.generate_num):
                 raw_expr = json_res["expressions"][i]
                 explanation = json_res["explanations"][i]
+                record = {"expression": raw_expr, "outcome": "invalid"}
+                candidates.append(record)
                 if self.graph.search(raw_expr.strip()) is not None:
                     node = self.graph.search(raw_expr.strip())
                     expr = node.payload.expression
                     print(f"Expression {raw_expr} already exists in the graph, not inserting.")
                     ic, icir, _ = self.pool.get_ic_icir_mutics(expr)
                     mut_ic = self.pool.get_mutl_ic(expr=expr)
+                    record.update(outcome="duplicate", ic=_num(ic), icir=_num(icir), max_mut_ic=_num(mut_ic))
                     if ic is not None:
                         if np.abs(parent_icir) < np.abs(icir) and np.abs(ic) > args.ic_threshold:
                             print(f"Expression {str(expr)} has higher ICIR {icir:.4f} than parent ICir {parent_icir:.4f}, while {str(expr)} ic {ic:.4f}, parent IC {parent_ic:.4f}. Try to insert early generated expression.")
-                            self.pool.try_new_expr(expr, node.topic, node.description, node)
-                        elif (np.abs(parent_icir) >= np.abs(icir) and mut_ic is not None 
-                              and np.abs(mut_ic) < args.ic_new_threshold 
-                              and np.abs(ic) > args.ic_threshold 
+                            accepted = self.pool.try_new_expr(expr, node.topic, node.description, node)
+                            record["outcome"] = "duplicate_reinserted" if accepted else "duplicate_pool_rejected"
+                        elif (np.abs(parent_icir) >= np.abs(icir) and mut_ic is not None
+                              and np.abs(mut_ic) < args.ic_new_threshold
+                              and np.abs(ic) > args.ic_threshold
                               and np.abs(icir) > np.abs(parent_icir) * args.icir_decay_threshold
                               and np.max(np.abs(mut_ic)) < np.max(np.abs(parent_mut))):
                             print(f"Expression {str(expr)} has sufficient lower MutIC {mut_ic:.4f}, with parent mutic {np.max(np.abs(parent_mut)):.4f}. Try to insert early generated expression.")
-                            self.pool.try_new_expr(expr, node.topic, node.description, node)
+                            accepted = self.pool.try_new_expr(expr, node.topic, node.description, node)
+                            record["outcome"] = "duplicate_reinserted" if accepted else "duplicate_pool_rejected"
                     continue
                 expr_obj: Optional[exp_module.Expression] = None
                 if raw_expr.__contains__("%d"):
@@ -588,49 +650,94 @@ class AlphaKnowledgeTrainer:
                         except (InvalidExpressionException, ValueError) as exc:
                             print(f"Expression {expr_} is invalid: {exc}")
                             ic = None
-                        
+
                         if ic is not None and np.abs(ic) > max_ic:
                             max_ic = np.abs(ic)
                             max_windows = w
                     expr_ = raw_expr.replace("%d", str(max_windows))
+                    record["window"] = max_windows
                     try:
                         expr_obj = self.parser.parse(expr_)
                     except (InvalidExpressionException, ValueError) as exc:
                         print(f"Expression {expr_} is invalid: {exc}")
+                        record["error"] = str(exc)
                 else:
                     try:
                         expr_obj = self.parser.parse(raw_expr)
                         max_ic = self.pool.get_ic(expr_obj)
                     except (InvalidExpressionException, ValueError) as exc:
                         print(f"Expression {raw_expr} is invalid: {exc}")
+                        record["error"] = str(exc)
                 if expr_obj is not None:
                     ic, icir, mut_ics = self.pool.get_ic_icir_mutics(expr_obj)
+                    record.update(ic=_num(ic), icir=_num(icir), max_mut_ic=_max_abs(mut_ics))
                     expression_node = self.graph.build_expression_node(raw_expr.strip(), topic, explanation, args.max_length, np.abs(ic), np.abs(icir))
                     if expression_node is None:
                         print(f"Generated expression {raw_expr} is invalid, skipping.")
+                        record["outcome"] = "invalid_node"
                         continue
+                    record["outcome"] = "below_threshold"
                     if ic is not None and np.abs(ic) > args.ic_threshold and np.abs(icir) >np.abs(parent_icir):
                         res = self.pool.try_new_expr(expr_obj, topic, explanation, expression_node)
+                        record["outcome"] = "pool_rejected"
                         if res:
                             print(f"Inserted new expression {str(expr_obj)} with ICIR {icir:.4f} higher than parent ICIR {parent_icir:.4f}, while current ic {ic:.4f}, parent IC {parent_ic:.4f}.")
                             self.graph.insert(expression_node=expression_node, parent_node=node)
-                    elif (ic is not None and 
-                          np.max(np.abs(mut_ics)) < args.ic_new_threshold and 
+                            record["outcome"] = "inserted_higher_icir"
+                    elif (ic is not None and
+                          np.max(np.abs(mut_ics)) < args.ic_new_threshold and
                           np.abs(ic) > args.ic_threshold and
                           np.abs(icir) > np.abs(parent_icir) * args.icir_decay_threshold and
                           np.max(np.abs(mut_ics)) < np.max(np.abs(parent_mut))):
                         res = self.pool.try_new_expr(expr_obj, topic, explanation, expression_node)
+                        record["outcome"] = "pool_rejected"
                         if res:
                             print(f"Inserted new expression {str(expr_obj)} with sufficient lower MutIC {np.max(np.abs(mut_ics)):.4f} than parent expression mutic . Current ic {ic:.4f}, parent IC {parent_ic:.4f}. Current icir {icir:.4f}, parent ICIR {parent_icir:.4f}.")
                             self.graph.insert(expression_node=expression_node, parent_node=node)
+                            record["outcome"] = "inserted_lower_mutic"
+            evaluation.update(output=candidates)
+        return result
 
     def _log_status(self, iteration: int, args: Any):
-        self.logger.log(self.pool, self.graph, iteration)
-    
+        with self.tracer.observe("evaluate-pool", as_type="evaluator", input={"pool_size": self.pool.size}) as observation:
+            metrics = self.logger.log(self.pool, self.graph, iteration)
+            observation.update(output=metrics)
+        for split in ("Validation", "Test"):
+            for name in ("ic", "icir", "ric", "ricir", "ret_sharpe"):
+                value = metrics.get("combination", {}).get(split, {}).get(name)
+                self.tracer.score(f"{split.lower()}_{name}", value)
+
     def train(self, args: Any):
         iter_times = args.search_time
-        for it in range(iter_times):
-            print(f"=== Iteration {it+1}/{iter_times} ===")
-            self._train_one_iteration(step=it + 1, args=args)
-            if (it + 1) % args.log_freq == 0 or it == iter_times - 1:
-                self._log_status(it + 1, args)   
+        try:
+            for it in range(iter_times):
+                print(f"=== Iteration {it+1}/{iter_times} ===")
+                with self.tracer.iteration(it + 1, input={"step": it + 1, "pool_size": self.pool.size}) as root:
+                    stats = self._train_one_iteration(step=it + 1, args=args)
+                    best_ic = float(np.max(np.abs(self.pool.single_ics[:self.pool.size]))) if self.pool.size > 0 else None
+                    root.update(output={**stats, "pool_size": self.pool.size, "best_single_ic": best_ic})
+                    self.tracer.score("candidates", stats["candidates"])
+                    self.tracer.score("inserted", len(stats["inserted"]))
+                    self.tracer.score("insert_rate", len(stats["inserted"]) / stats["candidates"] if stats["candidates"] else 0.0)
+                    self.tracer.score("parse_failure_rate", stats["parse_failures"] / stats["nodes"] if stats["nodes"] else 0.0)
+                    self.tracer.score("pool_size", self.pool.size)
+                    self.tracer.score("best_single_ic", best_ic)
+                    if (it + 1) % args.log_freq == 0 or it == iter_times - 1:
+                        self._log_status(it + 1, args)
+                self.tracer.flush()
+        finally:
+            self.tracer.flush()
+
+
+def _num(value: Any) -> Optional[float]:
+    try:
+        return None if value is None else float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _max_abs(values: Any) -> Optional[float]:
+    try:
+        return None if values is None or len(values) == 0 else float(np.max(np.abs(values)))
+    except (TypeError, ValueError):
+        return None
