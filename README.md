@@ -82,6 +82,45 @@
   python run_adaptive_combination.py --expression_file your_expression_file
   ```
 
+  ### Reproduce the paper configuration
+
+  The paper configuration is stored in `config/alphaprobe_main.json`. It uses
+  the published 2010-2020 / 2021-2022H1 / 2022H2-2025H1 split, pool capacity
+  50, factor length limit 40, five offspring per generation, depth penalty
+  0.05, and retrieval penalty 0.10.
+
+  On Windows with an RTX 50-series GPU, run:
+
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File scripts/setup_windows.ps1
+  # Edit .env and set OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL_NAME,
+  # and QLIB_PATH_CN, then verify the environment:
+  .\.venv\Scripts\python.exe scripts/check_experiment.py
+  ```
+
+  To reuse an existing CUDA-enabled Python installation instead of downloading
+  PyTorch again, run:
+
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File scripts/setup_existing_cuda.ps1
+  .\.venv-existing-cuda\Scripts\python.exe scripts/check_experiment.py
+  ```
+
+  Generate factors for one dataset:
+
+  ```powershell
+  .\.venv\Scripts\python.exe train_new_work.py --config config/alphaprobe_main.json --instruments csi300 --seed 0
+  ```
+
+  The generated pool is written below `data/knowledge_logs/pool_50/` as
+  `pool_20.json`. Evaluate it with the adaptive factor integrator:
+
+  ```powershell
+  .\.venv\Scripts\python.exe run_adaptive_combination.py --config config/alphaprobe_main.json --instruments csi300 --expressions_file <path-to-pool_20.json>
+  ```
+
+  Repeat both commands with `csi500` and `csi1000` for all three datasets.
+
 ## **☎️ Contact**
 
 

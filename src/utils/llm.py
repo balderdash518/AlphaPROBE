@@ -118,15 +118,25 @@ class OpenAIModel:
         if self.max_tokens:
             kwargs["max_tokens"] = self.max_tokens
         started = time.perf_counter()
-        if self.stream:
-            raw_text, reasoning, finish_reason, usage = self._stream_completion(client, **kwargs)
-        else:
-            response = completions_with_backoff(client, **kwargs)
-            message = response.choices[0].message
-            raw_text = message.content or ""
-            reasoning = getattr(message, "reasoning_content", None) or ""
-            finish_reason = response.choices[0].finish_reason
-            usage = response.usage
+        while True:
+            try:
+                if self.stream:
+                    raw_text, reasoning, finish_reason, usage = self._stream_completion(client, **kwargs)
+                else:
+                    response = completions_with_backoff(client, **kwargs)
+                    message = response.choices[0].message
+                    raw_text = message.content or ""
+                    reasoning = getattr(message, "reasoning_content", None) or ""
+                    finish_reason = response.choices[0].finish_reason
+                    usage = response.usage
+                break
+            except openai.BadRequestError as exc:
+                # max_tokens is sized close to the context window; a longer prompt than
+                # expected overflows it, so shrink the output budget and try again.
+                if kwargs.get("max_tokens", 0) <= 4096 or not re.search(r"context|max_tokens|too long", str(exc), re.I):
+                    raise
+                kwargs["max_tokens"] -= 2048
+                print(f"[llm] prompt + max_tokens exceeds the context window; retrying with max_tokens={kwargs['max_tokens']}")
         generated_text, inline_reasoning = split_thinking(raw_text)
         self.last_call = {
             "reasoning": "\n".join(r for r in (reasoning.strip(), inline_reasoning) if r),

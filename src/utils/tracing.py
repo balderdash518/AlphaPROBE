@@ -26,6 +26,27 @@ from contextlib import ExitStack, contextmanager
 from typing import Any, Dict, Iterator, List, Mapping, Optional
 
 
+try:
+    from opentelemetry.sdk.trace.id_generator import IdGenerator as _IdGenerator
+except ImportError:
+    _IdGenerator = object
+
+
+class _OsRandomIdGenerator(_IdGenerator):
+    """Trace/span ids from OS randomness.
+
+    The default OpenTelemetry generator uses the global ``random`` module, which
+    reseed_everything() seeds, so every run with the same seed would reuse the
+    same trace and span ids and overwrite earlier runs in Langfuse.
+    """
+
+    def generate_span_id(self) -> int:
+        return int.from_bytes(os.urandom(8), "big") or 1
+
+    def generate_trace_id(self) -> int:
+        return int.from_bytes(os.urandom(16), "big") or 1
+
+
 class _NullObservation:
     def update(self, **_: Any) -> None:
         return None
@@ -68,7 +89,7 @@ class RunTracer:
             return None
         try:
             base_url = os.getenv("LANGFUSE_BASE_URL") or os.getenv("LANGFUSE_HOST")
-            return Langfuse(base_url=base_url)
+            return Langfuse(base_url=base_url, id_generator=_OsRandomIdGenerator())
         except Exception as exc:
             print(f"[langfuse] client initialisation failed; tracing disabled: {exc}")
             return None

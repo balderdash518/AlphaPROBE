@@ -6,10 +6,13 @@ from alphagen.data.expression import *
 from typing import Tuple, List, Union
 import json
 import argparse
+from dotenv import load_dotenv
 from datetime import datetime
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
+
+load_dotenv()
 
 from alphagen.utils.correlation import batch_pearsonr, batch_spearmanr, batch_ret, batch_sharpe_ratio, batch_max_drawdown
 from gan.utils.builder import exprs2tensor
@@ -289,33 +292,34 @@ def run(args):
         window = float('inf')
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.cuda)
+    device = torch.device(args.device or ('cuda:0' if torch.cuda.is_available() else 'cpu'))
     if args.instruments == 'sp500':
-        QLIB_PATH = 'PATH/TO/AlphaStruct/data/qlib_data/us_data_qlib'
+        QLIB_PATH = os.getenv('QLIB_PATH_SP500', 'PATH/TO/data/qlib_data/us_data_qlib')
     else:
-        QLIB_PATH = 'PATH/TO/.qlib/qlib_data/cn_data'
+        QLIB_PATH = os.getenv('QLIB_PATH_CN', 'PATH/TO/.qlib/qlib_data/cn_data')
     # 1. Define Target and Load Data
     close = Feature(FeatureType.CLOSE)
     target = Ref(close, -args.label_days) / close - 1
     return_target = Ref(close, -1) / close - 1
 
-    train_end_time = f'{args.train_end_year}-12-31'
-    valid_start_time = f'{args.train_end_year + 1}-01-01'
-    valid_end_time = f'{args.train_end_year + 2}-06-30'
-    test_start_time = f'{args.train_end_year + 2}-07-01'
-    test_end_time = f'{args.train_end_year + 5}-06-30'
+    train_end_time = args.train_end
+    valid_start_time = args.valid_start
+    valid_end_time = args.valid_end
+    test_start_time = args.test_start
+    test_end_time = args.test_end
     print(args.instruments)
     data_all = StockData(instrument=args.instruments,
-                         start_time='2010-01-01',
+                         start_time=args.train_start,
                          end_time=test_end_time,
-                         qlib_path=QLIB_PATH)
+                         qlib_path=QLIB_PATH, device=device)
     data_valid = StockData(instrument=args.instruments,
                            start_time=valid_start_time,
                            end_time=valid_end_time,
-                           qlib_path=QLIB_PATH)
+                           qlib_path=QLIB_PATH, device=device)
     data_test = StockData(instrument=args.instruments,
                           start_time=test_start_time,
                           end_time=test_end_time,
-                          qlib_path=QLIB_PATH)
+                          qlib_path=QLIB_PATH, device=device)
 
     # 2. Load expressions and convert to tensor
     print(f"Loading expressions from {args.expressions_file}...")
@@ -324,11 +328,13 @@ def run(args):
 
     if args.use_weights:
         fct_tensor = exprs2tensor(expressions, data_test, normalize=True)
-        weights = torch.tensor(weights).cuda()
+        weights = torch.tensor(weights, device=device)
         fct_tensor = fct_tensor @ weights
         tgt_tensor = exprs2tensor([target], data_test, normalize=False)
         ret_tgt_tensor = exprs2tensor([return_target], data_all, normalize=False)
-        test_results, ret_s = get_tensor_metrics(fct_tensor.cuda(), tgt_tensor.cuda())
+        test_results, ret_s = get_tensor_metrics(
+            fct_tensor.to(device), tgt_tensor.to(device), ret_tgt_tensor.to(device)
+        )
         ret_s = ret_s.cpu().numpy()
         save_path = os.path.join(os.path.dirname(args.expressions_file), 'ret_s.npy')
         np.save(save_path, ret_s)
@@ -476,8 +482,8 @@ def run(args):
         tgt_test_ret = ret_tgt_tensor[start_day + data_valid.n_days :, :, 0]
         
         # Calculate metrics
-        valid_results, _ = get_tensor_metrics(pred_valid.cuda(), tgt_valid.cuda(), tgt_valid_ret.cuda())
-        test_results, ret_s = get_tensor_metrics(pred_test.cuda(),tgt_test.cuda(), tgt_test_ret.cuda())
+        valid_results, _ = get_tensor_metrics(pred_valid.to(device), tgt_valid.to(device), tgt_valid_ret.to(device))
+        test_results, ret_s = get_tensor_metrics(pred_test.to(device), tgt_test.to(device), tgt_test_ret.to(device))
         ret_s = ret_s.cpu().numpy()
         save_path = os.path.join(os.path.dirname(args.expressions_file), 'ret_s.npy')
         np.save(save_path, ret_s)
@@ -502,14 +508,21 @@ def run(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--expressions_file', type=str, required=True,
+    parser.add_argument('--config', default='config/alphaprobe_main.json')
+    parser.add_argument('--expressions_file', type=str,
                         help='Path to a JSON file containing a list of alpha expressions.')
     parser.add_argument('--instruments', type=str, default='csi300')
-    parser.add_argument('--train_end_year', type=int, default=2020)
+    parser.add_argument('--train_start', type=str, default='2010-01-01')
+    parser.add_argument('--train_end', type=str, default='2020-12-31')
+    parser.add_argument('--valid_start', type=str, default='2021-01-01')
+    parser.add_argument('--valid_end', type=str, default='2022-06-30')
+    parser.add_argument('--test_start', type=str, default='2022-07-01')
+    parser.add_argument('--test_end', type=str, default='2025-06-30')
     parser.add_argument('--threshold_ric', type=float, default=0.015)
     parser.add_argument('--threshold_ricir', type=float, default=0.15)
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--cuda', type=int, default=1)
+    parser.add_argument('--cuda', type=int, default=0)
+    parser.add_argument('--device', type=str, default=None)
     parser.add_argument('--n_factors', type=int, default=15,
                         help='Maximum number of factors to select at each step.')
     parser.add_argument('--chunk_size', type=int, default=250,
@@ -518,17 +531,29 @@ if __name__ == '__main__':
                         help="Rolling window size for factor evaluation. 'inf' for expanding window.")
     parser.add_argument('--label_days', type=int, default=20,
                         help="Number of days to label the target.")
-    parser.add_argument('--use_weights', type=bool, default=False,
+    parser.add_argument('--use_weights', action=argparse.BooleanOptionalAction, default=False,
                         help="Whether to use weights for the factors.")
     parser.add_argument('--corr_threshold', type=float, default=0.95,
                         help="Correlation threshold for multicollinearity detection.")
     parser.add_argument('--ridge_alpha', type=float, default=1e-6,
                         help="Ridge regression regularization parameter.")
-    parser.add_argument('--use_vif', type=bool, default=False,
+    parser.add_argument('--use_vif', action=argparse.BooleanOptionalAction, default=False,
                         help="Whether to use VIF for multicollinearity detection.")
     parser.add_argument('--linear_dep_tol', type=float, default=1e-10,
                         help="Tolerance for linear dependence detection.")
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument('--config', default='config/alphaprobe_main.json')
+    config_path = config_parser.parse_known_args()[0].config
+    if os.path.exists(config_path):
+        with open(config_path, encoding='utf-8') as config_file:
+            config = json.load(config_file)
+        known = {action.dest for action in parser._actions}
+        parser.set_defaults(**{key: value for key, value in config.items() if key in known})
+    elif '--config' in os.sys.argv:
+        parser.error(f'Configuration file not found: {config_path}')
     args = parser.parse_args()
+    if not args.expressions_file:
+        parser.error('--expressions_file is required')
     
     # Set seed for reproducibility
     torch.manual_seed(args.seed)

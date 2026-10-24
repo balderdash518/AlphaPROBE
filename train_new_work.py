@@ -7,6 +7,7 @@ from alphagen_generic.features import *
 from alphagen_qlib.stock_data import StockData
 from alphagen.data.tree import ExpressionParser
 import argparse
+import json
 import os
 import torch
 from dotenv import load_dotenv
@@ -15,9 +16,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
 from alpha_knowledge.alpha_knowledge_trainer import AlphaKnowledgeTrainer
+from alphagen.utils.random import reseed_everything
 
 INITIAL_EXPR = [
     ('Div($high, $close)', 'Interday price movements', "This expression measures the daily high-to-close ratio by dividing the day's highest price by its closing price, which is useful for identifying intraday strength or weakness in price momentum and potential reversal signals."),
@@ -56,6 +58,7 @@ def train(args):
     # Resolved after CUDA_VISIBLE_DEVICES is set: checking CUDA earlier would pin the visible devices.
     if args.device is None:
         args.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    reseed_everything(args.seed)
     # Read QLIB_PATH from environment variables
     if args.instruments == 'sp500':
         QLIB_PATH = os.getenv('QLIB_PATH_SP500', 'PATH/TO/data/qlib_data/us_data_qlib')
@@ -63,8 +66,8 @@ def train(args):
         QLIB_PATH = os.getenv('QLIB_PATH_CN', 'PATH/TO/.qlib/qlib_data/cn_data')
     # Initialize StockData and target expression
     device = torch.device(args.device)
-    data = StockData(instrument=args.instruments, start_time='2014-01-01', end_time='2020-12-31', qlib_path=QLIB_PATH, device=device)
-    data_test = StockData(instrument=args.instruments, start_time='2022-07-01', end_time='2025-06-30', qlib_path=QLIB_PATH, device=device)
+    data = StockData(instrument=args.instruments, start_time=args.train_start, end_time=args.train_end, qlib_path=QLIB_PATH, device=device)
+    data_test = StockData(instrument=args.instruments, start_time=args.test_start, end_time=args.test_end, qlib_path=QLIB_PATH, device=device)
     close = Feature(FeatureType.CLOSE)
     target = Ref(close, -20) / close - 1
     # expression_parser = ExpressionParser()
@@ -80,31 +83,41 @@ def train(args):
         use_semantic_similarity=args.use_semantic_similarity,
         use_edit_distance=args.use_edit_distance,
         separate_leaf_non_leaf=args.separate_leaf_non_leaf,
+        times_decay=args.times_decay,
+        start_times=args.start_times,
         device = args.device
     )
     trainer = AlphaKnowledgeTrainer(pool = pool, initial_expressions= INITIAL_EXPR, test_data= data_test, target= target, args=args)
     trainer.train(args)
 
-if __name__ == '__main__':
+def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--config', default='config/alphaprobe_main.json',
+                        help='JSON configuration file. Explicit CLI arguments override it.')
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--cuda', type=int, default=0, help='GPU index exposed through CUDA_VISIBLE_DEVICES.')
     parser.add_argument('--device', type=str, default=None,
                         help="Torch device for data, factor evaluation and the embedding model, e.g. 'cuda:0' or 'cpu'. Default: cuda:0 when available, else cpu.")
     parser.add_argument('--instruments', type=str, default='csi300')
+    parser.add_argument('--train_start', type=str, default='2010-01-01')
+    parser.add_argument('--train_end', type=str, default='2020-12-31')
+    parser.add_argument('--valid_start', type=str, default='2021-01-01')
+    parser.add_argument('--valid_end', type=str, default='2022-06-30')
+    parser.add_argument('--test_start', type=str, default='2022-07-01')
+    parser.add_argument('--test_end', type=str, default='2025-06-30')
     parser.add_argument('--temp', type=float, default=0.5)
     parser.add_argument('--pool_capacity', type=int, default=50)
     parser.add_argument('--log_freq', type=int, default=1)
-    parser.add_argument('--max_length', type=int, default=50)
+    parser.add_argument('--max_length', type=int, default=40)
     parser.add_argument('--depth_limit', type=int, default=7)
     parser.add_argument('--generate_num', type=int, default=5)
     parser.add_argument('--top_k', type=int, default= 15)
     parser.add_argument("--depth_decay", type=float, default=0.05)
     parser.add_argument("--embedding_model_name", type=str, default=os.getenv("EMBEDDING_MODEL_NAME", "Qwen/Qwen3-Embedding-4B"))
-    parser.add_argument("--use_res_correlation", type=bool, default=True)
-    parser.add_argument("--use_semantic_similarity", type=bool, default=True)
-    parser.add_argument("--use_edit_distance", type=bool, default=False)
-    parser.add_argument("--separate_leaf_non_leaf", type=bool, default=True)
+    parser.add_argument("--use_res_correlation", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--use_semantic_similarity", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--use_edit_distance", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--separate_leaf_non_leaf", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--search_time', type=int, default=20)
     parser.add_argument("--times_decay", type=float, default=0.10)
     parser.add_argument('--start_times', type=int, default=2)
@@ -126,10 +139,27 @@ if __name__ == '__main__':
                         help="Correlation threshold for multicollinearity detection.")
     parser.add_argument('--ridge_alpha', type=float, default=1e-6,
                         help="Ridge regression regularization parameter.")
-    parser.add_argument('--use_vif', type=bool, default=False,
+    parser.add_argument('--use_vif', action=argparse.BooleanOptionalAction, default=False,
                         help="Whether to use VIF for multicollinearity detection.")
     parser.add_argument('--linear_dep_tol', type=float, default=1e-10,
                         help="Tolerance for linear dependence detection.")
-    args = parser.parse_args()
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument('--config', default='config/alphaprobe_main.json')
+    config_path = config_parser.parse_known_args()[0].config
+    if os.path.exists(config_path):
+        with open(config_path, encoding='utf-8') as config_file:
+            config = json.load(config_file)
+        known = {action.dest for action in parser._actions}
+        unknown = sorted(set(config) - known)
+        if unknown:
+            parser.error(f"Unknown configuration keys: {', '.join(unknown)}")
+        parser.set_defaults(**config)
+    elif '--config' in os.sys.argv:
+        parser.error(f'Configuration file not found: {config_path}')
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    args = parse_args()
     print(args)
     train(args)

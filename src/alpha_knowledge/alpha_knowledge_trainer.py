@@ -281,12 +281,11 @@ class AlphaKnowledgeLogger:
         device = torch.device(self.args.device)
         close = exp_module.Feature(exp_module.FeatureType.CLOSE)
         target = exp_module.Ref(close, - 20) / close - 1
-        train_end_time = f'2020-12-31'
-        valid_start_time = f'2021-01-01'
-        valid_end_time = f'2022-06-30'
-        test_start_time = f'2022-07-01'
-        test_end_time = f'2025-06-30'
-        data_all = StockData(instrument=self.args.instruments, start_time='2010-01-01', end_time=test_end_time, qlib_path=QLIB_PATH, device=device)
+        valid_start_time = self.args.valid_start
+        valid_end_time = self.args.valid_end
+        test_start_time = self.args.test_start
+        test_end_time = self.args.test_end
+        data_all = StockData(instrument=self.args.instruments, start_time=self.args.train_start, end_time=test_end_time, qlib_path=QLIB_PATH, device=device)
         data_valid = StockData(instrument=self.args.instruments, start_time=valid_start_time, end_time=valid_end_time, qlib_path=QLIB_PATH, device=device)
         data_test = StockData(instrument=self.args.instruments, start_time=test_start_time, end_time=test_end_time, qlib_path=QLIB_PATH, device=device)
         
@@ -502,7 +501,7 @@ class AlphaKnowledgeTrainer:
         log_dir = os.path.join(
         'data/knowledge_logs',
         f'pool_{args.pool_capacity}',
-        f'kg_dag_and_bayesian_icir_and_mutl_new_no_decay_{model_name.replace("/", "_")}_{args.generate_num}_{args.instruments}_{args.temp}_{args.depth_limit}_{args.max_length}_{args.ic_mut_threshold}_{args.pool_capacity}_{args.search_time}_{args.ic_threshold}_{args.use_res_correlation}_{args.use_semantic_similarity}_{args.use_edit_distance}_{args.separate_leaf_non_leaf}_{args.icir_decay_threshold}_{args.times_decay}_{args.depth_decay}')
+        f'kg_dag_and_bayesian_icir_and_mutl_new_no_decay_{model_name.replace("/", "_")}_{args.generate_num}_{args.instruments}_seed{args.seed}_{args.temp}_{args.depth_limit}_{args.max_length}_{args.ic_mut_threshold}_{args.pool_capacity}_{args.search_time}_{args.ic_threshold}_{args.use_res_correlation}_{args.use_semantic_similarity}_{args.use_edit_distance}_{args.separate_leaf_non_leaf}_{args.icir_decay_threshold}_{args.times_decay}_{args.depth_decay}')
 
         os.makedirs(log_dir, exist_ok=True)
         self.logger = AlphaKnowledgeLogger(test_data, target, log_dir, args)
@@ -582,7 +581,7 @@ class AlphaKnowledgeTrainer:
                                                       "max_tokens": self.model.max_tokens, "stream": self.model.stream}) as generation:
             res, finish_reason = self.model.chat_generate(self.client, system_prompt = PROMPT_HEAD, user_prompt = generation_prompt, temperature = args.temp)
             call = self.model.last_call
-            generation.update(output=res, usage_details=call.get("usage_details") or None,
+            generation.update(output={"role": "assistant", "content": res}, usage_details=call.get("usage_details") or None,
                               metadata={"finish_reason": finish_reason, "latency_s": call.get("latency_s"),
                                         "reasoning": call.get("reasoning") or None})
         result = {"parse_failed": False, "candidates": []}
