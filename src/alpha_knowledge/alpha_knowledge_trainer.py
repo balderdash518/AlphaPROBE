@@ -514,7 +514,8 @@ class AlphaKnowledgeTrainer:
         max_tokens = os.getenv("LLM_MAX_TOKENS")
         self.model = OpenAIModel(model_name, "", 400000,
                                  max_tokens=int(max_tokens) if max_tokens else None,
-                                 stream=os.getenv("LLM_STREAM", "false").lower() in ("1", "true", "yes"))
+                                 stream=os.getenv("LLM_STREAM", "false").lower() in ("1", "true", "yes"),
+                                 thinking=os.getenv("LLM_THINKING") or None)
         run_id = time.strftime("%Y%m%d-%H%M%S")
         self.tracer = RunTracer(
             session_id=f"alphaprobe-{args.instruments}-{run_id}",
@@ -578,7 +579,8 @@ class AlphaKnowledgeTrainer:
         with self.tracer.generation("generate-offspring", model=self.model.model_name,
                                     system_prompt=PROMPT_HEAD, user_prompt=generation_prompt,
                                     model_parameters={"temperature": args.temp, "top_p": 1,
-                                                      "max_tokens": self.model.max_tokens, "stream": self.model.stream}) as generation:
+                                                      "max_tokens": self.model.max_tokens, "stream": self.model.stream,
+                                                      "thinking": self.model.thinking}) as generation:
             res, finish_reason = self.model.chat_generate(self.client, system_prompt = PROMPT_HEAD, user_prompt = generation_prompt, temperature = args.temp)
             call = self.model.last_call
             generation.update(output={"role": "assistant", "content": res}, usage_details=call.get("usage_details") or None,

@@ -70,13 +70,15 @@ def usage_details(usage) -> dict[str, int]:
 
 
 class OpenAIModel:
-    def __init__(self, model_name, stop_words, max_new_tokens, max_tokens=None, stream=False) -> None:
+    def __init__(self, model_name, stop_words, max_new_tokens, max_tokens=None, stream=False, thinking=None) -> None:
         self.model_name = model_name
         self.stop_words = stop_words
         self.max_new_tokens = max_new_tokens
         # Sent with chat_generate only when set; None keeps the server default.
         self.max_tokens = max_tokens
         self.stream = stream
+        # DeepSeek-style thinking switch ("enabled"/"disabled"); None sends nothing.
+        self.thinking = thinking
         self.last_call: dict[str, Any] = {}
 
     def _stream_completion(self, client, **kwargs):
@@ -117,6 +119,8 @@ class OpenAIModel:
             kwargs["stop"] = self.stop_words
         if self.max_tokens:
             kwargs["max_tokens"] = self.max_tokens
+        if self.thinking:
+            kwargs["extra_body"] = {"thinking": {"type": self.thinking}}
         started = time.perf_counter()
         while True:
             try:
