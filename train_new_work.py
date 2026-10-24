@@ -1,6 +1,7 @@
 from alpha_knowledge.alpha_pool import AlphaKnowledgePool
 from openai import OpenAI
 from utils.llm import OpenAIModel
+from utils.keep_awake import prevent_idle_sleep
 from tqdm import tqdm
 from alphagen.data.expression import *
 from alphagen_generic.features import *
@@ -143,6 +144,8 @@ def parse_args():
                         help="Whether to use VIF for multicollinearity detection.")
     parser.add_argument('--linear_dep_tol', type=float, default=1e-10,
                         help="Tolerance for linear dependence detection.")
+    parser.add_argument('--resume', action=argparse.BooleanOptionalAction, default=False,
+                        help="Continue from <log dir>/checkpoint.pt (written after every iteration) if it exists.")
     config_parser = argparse.ArgumentParser(add_help=False)
     config_parser.add_argument('--config', default='config/alphaprobe_main.json')
     config_path = config_parser.parse_known_args()[0].config
@@ -162,4 +165,5 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     print(args)
+    prevent_idle_sleep()
     train(args)

@@ -16,6 +16,7 @@ load_dotenv()
 
 from alphagen.utils.correlation import batch_pearsonr, batch_spearmanr, batch_ret, batch_sharpe_ratio, batch_max_drawdown
 from gan.utils.builder import exprs2tensor
+from utils.keep_awake import prevent_idle_sleep
 
 
 def remove_linearly_dependent_rows(x, y, to_pred, tol=1e-10):
@@ -559,4 +560,5 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
+    prevent_idle_sleep()
     run(args)

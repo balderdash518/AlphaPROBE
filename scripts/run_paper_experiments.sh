@@ -5,10 +5,13 @@
 #
 #   bash scripts/run_paper_experiments.sh            # run the queue
 #   bash scripts/run_paper_experiments.sh --list     # print the queue only
+#   bash scripts/run_paper_experiments.sh main_sp500 main_csi300   # only these jobs
 #
 # A job that finished writes logs/paper/<name>.done and is skipped on the next
-# start, so the queue can be stopped and restarted. If a train_new_work.py run
-# is already going (e.g. started by hand), the queue waits for it first.
+# start. Training runs with --resume, so a job interrupted mid-way (shutdown,
+# crash) continues from its last finished iteration when the queue is started
+# again. If a train_new_work.py run is already going (e.g. started by hand),
+# the queue waits for it first.
 # Not covered (no code in this repo): baselines from other projects, random /
 # heuristic / MCTS retrievers, w/o Prior, w/o Likelihood, CoT generator.
 set -u
@@ -54,6 +57,15 @@ if [ "${1:-}" = "--list" ]; then
   exit 0
 fi
 
+if [ $# -gt 0 ]; then
+  selected=()
+  for job in "${JOBS[@]}"; do
+    for want in "$@"; do [ "${job%%|*}" = "$want" ] && selected+=("$job"); done
+  done
+  [ ${#selected[@]} -eq $# ] || { echo "unknown job name in: $* (see --list)"; exit 1; }
+  JOBS=("${selected[@]}")
+fi
+
 training_running() {
   powershell -NoProfile -Command "@(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { \$_.CommandLine -like '*train_new_work*' }).Count" | tr -d '\r'
 }
@@ -69,15 +81,17 @@ for job in "${JOBS[@]}"; do
   name=${job%%|*}; args=${job#*|}
   [ -f "$LOG_DIR/$name.done" ] && { note "skip $name (done)"; continue; }
   instruments=$(sed -E 's/.*--instruments ([^ ]+).*/\1/' <<<"$args")
-  stamp="$LOG_DIR/$name.start"; touch "$stamp"
+  train_log="$LOG_DIR/$name.train.log"
 
   note "train $name: $args"
+  echo "===== $(date '+%F %T') start/resume =====" >> "$train_log"
   # shellcheck disable=SC2086
-  if ! $PY train_new_work.py --config "$CONFIG" --seed 0 $args > "$LOG_DIR/$name.train.log" 2>&1; then
-    note "FAILED train $name (see $LOG_DIR/$name.train.log)"; continue
+  if ! $PY train_new_work.py --config "$CONFIG" --seed 0 --resume $args >> "$train_log" 2>&1; then
+    note "FAILED train $name (see $train_log); start the queue again to resume it"; continue
   fi
-  pool=$(find data/knowledge_logs -name pool_20.json -newer "$stamp" -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-)
-  if [ -z "$pool" ]; then note "FAILED $name: no pool_20.json written"; continue; fi
+  run_dir=$(grep -a '^Log dir: ' "$train_log" | tail -1 | cut -d' ' -f3-)
+  pool="$run_dir/pool_20.json"
+  if [ ! -f "$pool" ]; then note "FAILED $name: $pool not found"; continue; fi
 
   note "combine $name: $pool"
   if ! $PY run_adaptive_combination.py --config "$CONFIG" --seed 0 --instruments "$instruments" \

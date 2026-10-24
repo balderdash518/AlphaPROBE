@@ -6,6 +6,7 @@ import pandas as pd
 from alpha_knowledge.alpha_pool import AlphaKnowledgePool
 from alphagen.data.expression_knowledge_graph import ExpressionKnowledgeGraph, ExpressionNode
 from alphagen.data import expression as exp_module
+from alphagen.data.expression import OutOfDataRangeError
 from alphagen.data.tree import ExpressionParser, InvalidExpressionException
 from alphagen_qlib.stock_data import StockData
 from alphagen.utils.correlation import batch_pearsonr, batch_spearmanr, batch_ret, batch_sharpe_ratio, batch_max_drawdown
@@ -19,6 +20,7 @@ from utils.tracing import RunTracer
 from tqdm import tqdm
 from alphagen.data.dimension import DimensionCalculator, _is_close
 
+import random
 import re
 import time
 
@@ -504,6 +506,7 @@ class AlphaKnowledgeTrainer:
         f'kg_dag_and_bayesian_icir_and_mutl_new_no_decay_{model_name.replace("/", "_")}_{args.generate_num}_{args.instruments}_seed{args.seed}_{args.temp}_{args.depth_limit}_{args.max_length}_{args.ic_mut_threshold}_{args.pool_capacity}_{args.search_time}_{args.ic_threshold}_{args.use_res_correlation}_{args.use_semantic_similarity}_{args.use_edit_distance}_{args.separate_leaf_non_leaf}_{args.icir_decay_threshold}_{args.times_decay}_{args.depth_decay}')
 
         os.makedirs(log_dir, exist_ok=True)
+        print(f"Log dir: {log_dir}")
         self.logger = AlphaKnowledgeLogger(test_data, target, log_dir, args)
         # API key, base url and model name come from .env (see .env.example)
         self.client = OpenAI(
@@ -648,7 +651,7 @@ class AlphaKnowledgeTrainer:
                         try:
                             expr_obj = self.parser.parse(expr_)
                             ic = self.pool.get_ic(expr_obj)
-                        except (InvalidExpressionException, ValueError) as exc:
+                        except (InvalidExpressionException, ValueError, OutOfDataRangeError) as exc:
                             print(f"Expression {expr_} is invalid: {exc}")
                             ic = None
 
@@ -666,11 +669,17 @@ class AlphaKnowledgeTrainer:
                     try:
                         expr_obj = self.parser.parse(raw_expr)
                         max_ic = self.pool.get_ic(expr_obj)
-                    except (InvalidExpressionException, ValueError) as exc:
+                    except (InvalidExpressionException, ValueError, OutOfDataRangeError) as exc:
+                        # OutOfDataRangeError: nested rolling windows look back past the loaded data.
                         print(f"Expression {raw_expr} is invalid: {exc}")
                         record["error"] = str(exc)
                 if expr_obj is not None:
-                    ic, icir, mut_ics = self.pool.get_ic_icir_mutics(expr_obj)
+                    try:
+                        ic, icir, mut_ics = self.pool.get_ic_icir_mutics(expr_obj)
+                    except OutOfDataRangeError as exc:
+                        print(f"Expression {expr_obj} needs more history than the loaded data: {exc!r}")
+                        record["error"] = "OutOfDataRangeError"
+                        continue
                     record.update(ic=_num(ic), icir=_num(icir), max_mut_ic=_max_abs(mut_ics))
                     expression_node = self.graph.build_expression_node(raw_expr.strip(), topic, explanation, args.max_length, np.abs(ic), np.abs(icir))
                     if expression_node is None:
@@ -708,10 +717,51 @@ class AlphaKnowledgeTrainer:
                 value = metrics.get("combination", {}).get(split, {}).get(name)
                 self.tracer.score(f"{split.lower()}_{name}", value)
 
+    @property
+    def checkpoint_path(self) -> str:
+        return os.path.join(self.logger.log_dir, "checkpoint.pt")
+
+    def save_checkpoint(self, iteration: int) -> None:
+        """Everything the next iteration depends on, written atomically after each iteration."""
+        state = {
+            "iteration": iteration,
+            "graph": self.graph,
+            # Pool attributes minus what is rebuilt from the data on start-up; pickled together
+            # with the graph so pool.expr2node keeps pointing at the same graph nodes.
+            "pool": {k: v for k, v in self.pool.__dict__.items() if k not in _POOL_RUNTIME_ATTRS},
+            "rng": {"python": random.getstate(), "numpy": np.random.get_state(), "torch": torch.get_rng_state(),
+                    "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None},
+        }
+        tmp_path = self.checkpoint_path + ".tmp"
+        try:
+            torch.save(state, tmp_path)
+            os.replace(tmp_path, self.checkpoint_path)
+        except Exception as exc:
+            # A failed checkpoint must not end the run; it only loses the ability to resume.
+            print(f"WARNING: checkpoint after iteration {iteration} not saved: {exc!r}")
+
+    def load_checkpoint(self) -> int:
+        """Restore the state saved by save_checkpoint; returns the number of finished iterations."""
+        state = torch.load(self.checkpoint_path, map_location=self.pool.data.device, weights_only=False)
+        self.graph = state["graph"]
+        self.pool.__dict__.update(state["pool"])
+        self.pool.attach_knowledge_graph(self.graph)
+        rng = state["rng"]
+        random.setstate(rng["python"])
+        np.random.set_state(rng["numpy"])
+        torch.set_rng_state(rng["torch"])
+        if rng["cuda"] is not None and torch.cuda.is_available():
+            torch.cuda.set_rng_state_all(rng["cuda"])
+        return state["iteration"]
+
     def train(self, args: Any):
         iter_times = args.search_time
+        start = 0
+        if getattr(args, "resume", False) and os.path.exists(self.checkpoint_path):
+            start = self.load_checkpoint()
+            print(f"Resumed from {self.checkpoint_path} after iteration {start}/{iter_times} (pool size {self.pool.size})")
         try:
-            for it in range(iter_times):
+            for it in range(start, iter_times):
                 print(f"=== Iteration {it+1}/{iter_times} ===")
                 with self.tracer.iteration(it + 1, input={"step": it + 1, "pool_size": self.pool.size}) as root:
                     stats = self._train_one_iteration(step=it + 1, args=args)
@@ -725,9 +775,14 @@ class AlphaKnowledgeTrainer:
                     self.tracer.score("best_single_ic", best_ic)
                     if (it + 1) % args.log_freq == 0 or it == iter_times - 1:
                         self._log_status(it + 1, args)
+                self.save_checkpoint(it + 1)
                 self.tracer.flush()
         finally:
             self.tracer.flush()
+
+
+# Rebuilt from the stock data / model files when the pool is constructed, so not checkpointed.
+_POOL_RUNTIME_ATTRS = {"data", "target", "embedding_model", "knowledge_graph"}
 
 
 def _num(value: Any) -> Optional[float]:
