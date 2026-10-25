@@ -1,0 +1,150 @@
+Namespace(config='config/alphaprobe_main.json', seed=0, cuda=0, device='cuda:0', instruments='sp500', train_start='2010-01-01', train_end='2020-12-31', valid_start='2021-01-01', valid_end='2022-06-30', test_start='2022-07-01', test_end='2025-06-30', temp=0.5, pool_capacity=50, log_freq=1, max_length=40, depth_limit=7, generate_num=5, top_k=15, depth_decay=0.05, embedding_model_name='C:/yifei/AlphaPROBE/models/Qwen3-Embedding-4B', use_res_correlation=True, use_semantic_similarity=True, use_edit_distance=True, separate_leaf_non_leaf=True, search_time=20, times_decay=0.1, start_times=2, ic_threshold=0.006, ic_mut_threshold=0.9, ic_new_threshold=0.45, icir_decay_threshold=0.7, threshold_ric=0.015, threshold_ricir=0.15, n_factors=15, chunk_size=180, window='inf', label_days=20, corr_threshold=0.95, ridge_alpha=1e-06, use_vif=False, linear_dep_tol=1e-10)
+C:/Users/Administrator/.qlib/qlib_data/us_data_qlib us
+[10636:MainThread](2026-10-24 20:26:07,691) INFO - qlib.Initialization - [config.py:452] - default_conf: client.
+[10636:MainThread](2026-10-24 20:26:08,689) INFO - qlib.Initialization - [__init__.py:75] - qlib successfully initialized based on client settings.
+[10636:MainThread](2026-10-24 20:26:08,690) INFO - qlib.Initialization - [__init__.py:77] - data_path={'__DEFAULT_FREQ': WindowsPath('C:/Users/Administrator/.qlib/qlib_data/us_data_qlib')}
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:04<00:04,  4.05s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.16s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.30s/it]
+[Pool Add] Div($high,$close)
+[Pool Add] Div(Sub($high,$low),$open)
+[Pool Add] Div(Sub(Less($open,$close),$low),$open)
+[Pool Add] Div(Sub(Less($open,$close),$low),Add(Sub($high,$low),1e-06))
+[Pool Add] Div(Sub($close,$open),Add(Sub($high,$low),1e-06))
+[Pool Add] Div(Sub(Sub(Mul(2.0,$close),$high),$low),$open)
+[Pool Add] Div(Sub(Sub(Mul(2.0,$close),$high),$low),Add(Sub($high,$low),1e-06))
+[Pool Add] Div(Sub($high,GetGreater($open,$close)),$open)
+[Pool Add] Div(Sub($high,GetGreater($open,$close)),Add(Sub($high,$low),1e-06))
+[Pool Add] Div(TsStd($close,10),$close)
+[Pool Add] Div(TsMean(GetGreater(Sub($high,$low),GetGreater(Abs(Sub($high,Ref($close,1))),Abs(Sub($low,Ref($close,1))))),10),$close)
+[Pool Add] Sub(TsMean(Greater($close,Ref($close,1)),10),TsMean(Less($close,Ref($close,1)),10))
+[Pool Add] TsMean(Less($close,Ref($close,1)),10)
+[Pool Reject] TsMean(Greater($close,Ref($close,1)),10)
+[Pool Add] Div(TsMean($close,10),$close)
+[Pool Add] Div(TsMax($high,10),$close)
+[Pool Add] TsRank($close,10)
+[Pool Add] Div(Sub($close,TsMin($low,10)),Add(Sub(TsMax($high,10),TsMin($low,10)),1e-06))
+[Pool Add] Div(Sub(TsSum(GetGreater(Sub($close,Ref($close,1)),0.0),10),TsSum(GetGreater(Sub(Ref($close,1),$close),0.0),10)),Add(TsSum(Abs(Sub($close,Ref($close,1))),10),1e-06))
+[Pool Reject] Div(TsSum(GetGreater(Sub(Ref($close,1),$close),0.0),10),Add(TsSum(Abs(Sub($close,Ref($close,1))),10),1e-06))
+[Pool Reject] Div(TsSum(GetGreater(Sub($close,Ref($close,1)),0.0),10),Add(TsSum(Abs(Sub($close,Ref($close,1))),10),1e-06))
+[Pool Add] Div(TsStd(Mul(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume),10),Add(TsMean(Mul(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume),10),1e-06))
+[Pool Add] Div(TsMean($volume,10),Add($volume,1e-06))
+[Pool Add] Div(TsStd($volume,10),Add($volume,1e-06))
+[Pool Add] Div(Sub(TsSum(GetGreater(Sub($volume,Ref($volume,1)),0.0),10),TsSum(GetGreater(Sub(Ref($volume,1),$volume),0.0),10)),Add(TsSum(Abs(Sub($volume,Ref($volume,1))),10),1e-06))
+[Pool Reject] Div(TsSum(GetGreater(Sub($volume,Ref($volume,1)),0.0),10),Add(TsSum(Abs(Sub($volume,Ref($volume,1))),10),1e-06))
+[Pool Reject] Div(TsSum(GetGreater(Sub(Ref($volume,1),$volume),0.0),10),Add(TsSum(Abs(Sub($volume,Ref($volume,1))),10),1e-06))
+[Pool Add] TsCorr(Div($close,Ref($close,1)),Log(Add(Div($volume,Ref($volume,1)),1.0)),10)
+[Pool Add] TsCorr($close,Log(Add($volume,1.0)),10)
+Langfuse tracing: on (session alphaprobe-sp500-20261024-202703)
+=== Iteration 1/20 ===
+Step 1: optimizing 15 nodes: ['TsRank($close, %d)', 'Div(TsStd(Mul(Abs(Sub(Div($close, Ref($close, 1)), 1.0)), $volume), %d), Add(TsMean(Mul(Abs(Sub(Div($close, Ref($close, 1)), 1.0)), $volume), %d), 0.000001))', 'Div(Sub(TsSum(GetGreater(Sub($volume, Ref($volume, 1)), 0.0), %d), TsSum(GetGreater(Sub(Ref($volume, 1), $volume), 0.0), %d)), Add(TsSum(Abs(Sub($volume, Ref($volume, 1))), %d), 0.000001))', 'Div(TsStd($volume, %d), Add($volume, 0.000001))', 'TsCorr($close, Log(Add($volume, 1.0)), %d)', 'Div(Sub(Less($open, $close), $low), $open)', 'Div(TsMean($volume, %d), Add($volume, 0.000001))', 'Div(TsMax($high, %d), $close)', 'Div(TsMean(GetGreater(Sub($high, $low), GetGreater(Abs(Sub($high, Ref($close, 1))),Abs(Sub($low, Ref($close, 1))) )), %d), $close)', 'TsCorr(Div($close, Ref($close, 1)), Log(Add(Div($volume, Ref($volume, 1)), 1.0)), %d)', 'Div(Sub(Less($open, $close), $low), Add(Sub($high, $low), 0.000001))', 'Div(TsStd($close, %d), $close)', 'Div(Sub($high, GetGreater($open, $close)), Add(Sub($high, $low), 0.000001))', 'Div(TsMean($close, %d), $close)', 'Div($high, $close)']
+optimizing step 1: 0it [00:00, ?it/s]optimizing step 1: 1it [00:09,  9.29s/it][Pool Add] Div(TsStd(Mul(Abs(Sub(Div($close,$open),1.0)),$volume),20),Add(TsMean(Mul(Abs(Sub(Div($close,$open),1.0)),$volume),20),1e-06))
+Inserted new expression Div(TsStd(Mul(Abs(Sub(Div($close,$open),1.0)),$volume),20),Add(TsMean(Mul(Abs(Sub(Div($close,$open),1.0)),$volume),20),1e-06)) with ICIR 0.1337 higher than parent ICIR 0.0970, while current ic 0.0119, parent IC 0.0083.
+[Pool Add] Div(TsStd(Mul(Sub($high,$low),$volume),30),Add(TsMean(Mul(Sub($high,$low),$volume),30),1e-06))
+Inserted new expression Div(TsStd(Mul(Sub($high,$low),$volume),30),Add(TsMean(Mul(Sub($high,$low),$volume),30),1e-06)) with ICIR 0.1308 higher than parent ICIR 0.0970, while current ic 0.0133, parent IC 0.0083.
+[Pool Add] TsCorr(Sub(Div($close,$open),1.0),Div($volume,TsMean($volume,30)),30)
+Inserted new expression TsCorr(Sub(Div($close,$open),1.0),Div($volume,TsMean($volume,30)),30) with ICIR -0.1006 higher than parent ICIR 0.0970, while current ic -0.0083, parent IC 0.0083.
+[Pool Add] Div(TsMax(Mul(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume),30),Add(TsMin(Mul(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume),30),1e-06))
+Inserted new expression Div(TsMax(Mul(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume),30),Add(TsMin(Mul(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume),30),1e-06)) with ICIR 0.1308 higher than parent ICIR 0.0970, while current ic 0.0112, parent IC 0.0083.
+optimizing step 1: 2it [00:26, 14.11s/it][Pool Add] Div(TsSum(SLog1p(Sub($volume,Ref($volume,1))),30),Add(TsSum(Abs(SLog1p(Sub($volume,Ref($volume,1)))),30),1e-06))
+Inserted new expression Div(TsSum(SLog1p(Sub($volume,Ref($volume,1))),30),Add(TsSum(Abs(SLog1p(Sub($volume,Ref($volume,1)))),30),1e-06)) with ICIR -0.1281 higher than parent ICIR -0.0188, while current ic -0.0076, parent IC -0.0014.
+[Pool Add] Div(Sub(TsSum(GetGreater(Sub($close,$open),0.0),10),TsSum(GetGreater(Sub($open,$close),0.0),10)),Add(TsSum(Abs(Sub($close,$open)),10),1e-06))
+Inserted new expression Div(Sub(TsSum(GetGreater(Sub($close,$open),0.0),10),TsSum(GetGreater(Sub($open,$close),0.0),10)),Add(TsSum(Abs(Sub($close,$open)),10),1e-06)) with ICIR -0.0707 higher than parent ICIR -0.0188, while current ic -0.0091, parent IC -0.0014.
+[Pool Add] Div(TsSum(Mul(Sign(Sub($close,$open)),$volume),20),Add(TsSum($volume,20),1e-06))
+Inserted new expression Div(TsSum(Mul(Sign(Sub($close,$open)),$volume),20),Add(TsSum($volume,20),1e-06)) with ICIR -0.0913 higher than parent ICIR -0.0188, while current ic -0.0104, parent IC -0.0014.
+[Pool Add] Div(Sub(TsSum(GetGreater(Sub($close,$vwap),0.0),5),TsSum(GetGreater(Sub($vwap,$close),0.0),5)),Add(TsSum(Abs(Sub($close,$vwap)),5),1e-06))
+Inserted new expression Div(Sub(TsSum(GetGreater(Sub($close,$vwap),0.0),5),TsSum(GetGreater(Sub($vwap,$close),0.0),5)),Add(TsSum(Abs(Sub($close,$vwap)),5),1e-06)) with ICIR -0.0731 higher than parent ICIR -0.0188, while current ic -0.0085, parent IC -0.0014.
+optimizing step 1: 3it [00:40, 13.87s/it]optimizing step 1: 4it [00:48, 11.56s/it]optimizing step 1: 5it [00:55, 10.04s/it][Pool Add] Div(TsSum(Sub($close,$open),5),TsSum(Add($high,$low),5))
+Inserted new expression Div(TsSum(Sub($close,$open),5),TsSum(Add($high,$low),5)) with ICIR -0.0998 higher than parent ICIR -0.0198, while current ic -0.0157, parent IC -0.0025.
+[Pool Reject] SLog1p(Div(Sub($close,$vwap),$vwap))
+[Pool Reject] Rank(TsIr(Sub($close,$open),10))
+optimizing step 1: 6it [01:02,  9.10s/it][Pool Add] Sub(TsMean($volume,20),$volume)
+Inserted new expression Sub(TsMean($volume,20),$volume) with ICIR 0.0998 higher than parent ICIR 0.0309, while current ic 0.0089, parent IC 0.0043.
+[Pool Add] TsIr($volume,20)
+Inserted new expression TsIr($volume,20) with ICIR -0.1204 higher than parent ICIR 0.0309, while current ic -0.0088, parent IC 0.0043.
+optimizing step 1: 7it [01:09,  8.21s/it]optimizing step 1: 8it [01:16,  7.78s/it][Pool Add] Div(TsMean(TsMaxDiff($close,10),10),$close)
+Inserted new expression Div(TsMean(TsMaxDiff($close,10),10),$close) with ICIR -0.1069 higher than parent ICIR 0.0677, while current ic -0.0223, parent IC 0.0167.
+[Pool Add] Div(TsMean(Sub($high,$low),30),Sub(TsMax($high,30),TsMin($low,30)))
+Inserted new expression Div(TsMean(Sub($high,$low),30),Sub(TsMax($high,30),TsMin($low,30))) with ICIR 0.0798 higher than parent ICIR 0.0677, while current ic 0.0088, parent IC 0.0167.
+[Pool Add] TsCorr(Sub($high,$low),$volume,30)
+Inserted new expression TsCorr(Sub($high,$low),$volume,30) with ICIR 0.1406 higher than parent ICIR 0.0677, while current ic 0.0123, parent IC 0.0167.
+[Pool Add] Div(TsMean(Abs(TsDelta($close,1)),30),$close)
+Inserted new expression Div(TsMean(Abs(TsDelta($close,1)),30),$close) with ICIR 0.0846 higher than parent ICIR 0.0677, while current ic 0.0217, parent IC 0.0167.
+optimizing step 1: 9it [01:34, 10.91s/it][Pool Reject] TsCorr(Div(Sub($high,$low),$close),Div($volume,TsMean($volume,30)),30)
+optimizing step 1: 10it [01:53, 13.52s/it][Pool Add] Div(Sub(Less($open,$close),TsMin($low,5)),Add(TsMaxDiff($high,5),0.0001))
+Inserted new expression Div(Sub(Less($open,$close),TsMin($low,5)),Add(TsMaxDiff($high,5),0.0001)) with ICIR -0.1729 higher than parent ICIR -0.0374, while current ic -0.0148, parent IC -0.0034.
+[Pool Add] Div(Sub(Less($open,$close),TsMean($low,5)),Add(TsMinMaxDiff($high,5),0.0001))
+Inserted new expression Div(Sub(Less($open,$close),TsMean($low,5)),Add(TsMinMaxDiff($high,5),0.0001)) with ICIR -0.0807 higher than parent ICIR -0.0374, while current ic -0.0093, parent IC -0.0034.
+[Pool Reject] Div(Sub(Less($open,$close),TsMed($low,5)),Add(TsMad($high,5),0.0001))
+[Pool Add] Div(Sub(Less($open,$close),TsMin($low,5)),Add(TsStd($high,5),0.0001))
+Inserted new expression Div(Sub(Less($open,$close),TsMin($low,5)),Add(TsStd($high,5),0.0001)) with ICIR -0.0646 higher than parent ICIR -0.0374, while current ic -0.0066, parent IC -0.0034.
+[Pool Add] Div(Sub(Less($open,$close),TsMin($low,5)),Add(TsMean(TsMinMaxDiff($high,5),5),0.0001))
+Inserted new expression Div(Sub(Less($open,$close),TsMin($low,5)),Add(TsMean(TsMinMaxDiff($high,5),5),0.0001)) with ICIR -0.0802 higher than parent ICIR -0.0374, while current ic -0.0095, parent IC -0.0034.
+optimizing step 1: 11it [02:09, 14.43s/it][Pool Add] TsStd(Div(Sub($high,$low),$close),30)
+Inserted new expression TsStd(Div(Sub($high,$low),$close),30) with ICIR 0.1010 higher than parent ICIR 0.0503, while current ic 0.0219, parent IC 0.0100.
+[Pool Add] TsMean(TsMaxDiff($close,20),20)
+Inserted new expression TsMean(TsMaxDiff($close,20),20) with ICIR 0.2061 higher than parent ICIR 0.0503, while current ic 0.0205, parent IC 0.0100.
+[Pool Add] TsMean(TsMad(Div(Sub($close,$vwap),$vwap),30),30)
+Inserted new expression TsMean(TsMad(Div(Sub($close,$vwap),$vwap),30),30) with ICIR 0.0654 higher than parent ICIR 0.0503, while current ic 0.0161, parent IC 0.0100.
+optimizing step 1: 12it [02:27, 15.44s/it][Pool Reject] Div(Sub($close,$vwap),Add(Sub($high,$low),0.0001))
+[Pool Reject] Sub(TsRank($close,5),0.5)
+[Pool Add] Div(Sub(TsMax($high,5),$close),Add(TsMinMaxDiff($close,5),0.0001))
+Inserted new expression Div(Sub(TsMax($high,5),$close),Add(TsMinMaxDiff($close,5),0.0001)) with ICIR 0.0926 higher than parent ICIR 0.0183, while current ic 0.0107, parent IC 0.0017.
+optimizing step 1: 13it [02:37, 13.82s/it]optimizing step 1: 14it [02:46, 12.33s/it][Pool Add] Div($close,$open)
+Inserted new expression Div($close,$open) with ICIR -0.0630 higher than parent ICIR 0.0593, while current ic -0.0093, parent IC 0.0093.
+[Pool Add] TsMean(Div(Sub($high,$close),Add(Sub($high,$low),0.0001)),5)
+Inserted new expression TsMean(Div(Sub($high,$close),Add(Sub($high,$low),0.0001)),5) with ICIR 0.0774 higher than parent ICIR 0.0593, while current ic 0.0097, parent IC 0.0093.
+optimizing step 1: 15it [02:54, 10.86s/it]optimizing step 1: 15it [02:54, 11.60s/it]
+=== Logging at iteration 1 ===
+---------------------------------------------
+> Alpha #0: ic=0.0093, test_ic=-0.0166, test_icir=-0.1102, expr=Div($high,$close)
+> Alpha #1: ic=0.0044, test_ic=-0.0116, test_icir=-0.0649, expr=Div(Sub($high,$low),$open)
+> Alpha #2: ic=0.0025, test_ic=-0.0070, test_icir=-0.0529, expr=Div(Sub(Less($open,$close),$low),$open)
+> Alpha #3: ic=0.0034, test_ic=0.0019, test_icir=0.0197, expr=Div(Sub(Less($open,$close),$low),Add(Sub($high,$low),1e-06))
+> Alpha #4: ic=0.0059, test_ic=-0.0015, test_icir=-0.0119, expr=Div(Sub($close,$open),Add(Sub($high,$low),1e-06))
+> Alpha #5: ic=0.0108, test_ic=0.0089, test_icir=0.0633, expr=Div(Sub(Sub(Mul(2.0,$close),$high),$low),$open)
+> Alpha #6: ic=0.0073, test_ic=0.0020, test_icir=0.0169, expr=Div(Sub(Sub(Mul(2.0,$close),$high),$low),Add(Sub($high,$low),1e-06))
+> Alpha #7: ic=0.0025, test_ic=-0.0178, test_icir=-0.1285, expr=Div(Sub($high,GetGreater($open,$close)),$open)
+> Alpha #8: ic=0.0017, test_ic=-0.0057, test_icir=-0.0620, expr=Div(Sub($high,GetGreater($open,$close)),Add(Sub($high,$low),1e-06))
+> Alpha #9: ic=0.0100, test_ic=0.0085, test_icir=0.0479, expr=Div(TsStd($close,10),$close)
+> Alpha #10: ic=0.0167, test_ic=-0.0036, test_icir=-0.0151, expr=Div(TsMean(GetGreater(Sub($high,$low),GetGreater(Abs(Sub($high,Ref($close,1))),Abs(Sub($low,Ref($close,1))))),10),$close)
+> Alpha #11: ic=0.0215, test_ic=-0.0560, test_icir=-0.4491, expr=Sub(TsMean(Greater($close,Ref($close,1)),10),TsMean(Less($close,Ref($close,1)),10))
+> Alpha #12: ic=0.0181, test_ic=-0.0432, test_icir=-0.3935, expr=TsMean(Less($close,Ref($close,1)),10)
+> Alpha #13: ic=0.0272, test_ic=-0.0050, test_icir=-0.0331, expr=Div(TsMean($close,10),$close)
+> Alpha #14: ic=0.0260, test_ic=-0.0155, test_icir=-0.0932, expr=Div(TsMax($high,10),$close)
+> Alpha #15: ic=0.0106, test_ic=0.0014, test_icir=0.0125, expr=TsRank($close,10)
+> Alpha #16: ic=0.0142, test_ic=0.0011, test_icir=0.0083, expr=Div(Sub($close,TsMin($low,10)),Add(Sub(TsMax($high,10),TsMin($low,10)),1e-06))
+> Alpha #17: ic=0.0147, test_ic=0.0017, test_icir=0.0123, expr=Div(Sub(TsSum(GetGreater(Sub($close,Ref($close,1)),0.0),10),TsSum(GetGreater(Sub(Ref($close,1),$close),0.0),10)),Add(TsSum(Abs(Sub($close,Ref($close,1))),10),1e-06))
+> Alpha #18: ic=0.0083, test_ic=-0.0007, test_icir=-0.0094, expr=Div(TsStd(Mul(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume),10),Add(TsMean(Mul(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume),10),1e-06))
+> Alpha #19: ic=0.0043, test_ic=-0.0232, test_icir=-0.2388, expr=Div(TsMean($volume,10),Add($volume,1e-06))
+> Alpha #20: ic=0.0062, test_ic=-0.0322, test_icir=-0.3233, expr=Div(TsStd($volume,10),Add($volume,1e-06))
+> Alpha #21: ic=0.0014, test_ic=0.0027, test_icir=0.0387, expr=Div(Sub(TsSum(GetGreater(Sub($volume,Ref($volume,1)),0.0),10),TsSum(GetGreater(Sub(Ref($volume,1),$volume),0.0),10)),Add(TsSum(Abs(Sub($volume,Ref($volume,1))),10),1e-06))
+> Alpha #22: ic=0.0043, test_ic=-0.0016, test_icir=-0.0168, expr=TsCorr(Div($close,Ref($close,1)),Log(Add(Div($volume,Ref($volume,1)),1.0)),10)
+> Alpha #23: ic=0.0029, test_ic=0.0028, test_icir=0.0296, expr=TsCorr($close,Log(Add($volume,1.0)),10)
+> Alpha #24: ic=0.0119, test_ic=-0.0189, test_icir=-0.2490, expr=Div(TsStd(Mul(Abs(Sub(Div($close,$open),1.0)),$volume),20),Add(TsMean(Mul(Abs(Sub(Div($close,$open),1.0)),$volume),20),1e-06))
+> Alpha #25: ic=0.0133, test_ic=-0.0356, test_icir=-0.4545, expr=Div(TsStd(Mul(Sub($high,$low),$volume),30),Add(TsMean(Mul(Sub($high,$low),$volume),30),1e-06))
+> Alpha #26: ic=0.0083, test_ic=0.0057, test_icir=0.0655, expr=TsCorr(Sub(Div($close,$open),1.0),Div($volume,TsMean($volume,30)),30)
+> Alpha #27: ic=0.0112, test_ic=0.0115, test_icir=0.1586, expr=Div(TsMax(Mul(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume),30),Add(TsMin(Mul(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume),30),1e-06))
+> Alpha #28: ic=0.0076, test_ic=-0.0010, test_icir=-0.0181, expr=Div(TsSum(SLog1p(Sub($volume,Ref($volume,1))),30),Add(TsSum(Abs(SLog1p(Sub($volume,Ref($volume,1)))),30),1e-06))
+> Alpha #29: ic=0.0091, test_ic=0.0069, test_icir=0.0550, expr=Div(Sub(TsSum(GetGreater(Sub($close,$open),0.0),10),TsSum(GetGreater(Sub($open,$close),0.0),10)),Add(TsSum(Abs(Sub($close,$open)),10),1e-06))
+> Alpha #30: ic=0.0104, test_ic=0.0154, test_icir=0.1481, expr=Div(TsSum(Mul(Sign(Sub($close,$open)),$volume),20),Add(TsSum($volume,20),1e-06))
+> Alpha #31: ic=0.0085, test_ic=0.0060, test_icir=0.0520, expr=Div(Sub(TsSum(GetGreater(Sub($close,$vwap),0.0),5),TsSum(GetGreater(Sub($vwap,$close),0.0),5)),Add(TsSum(Abs(Sub($close,$vwap)),5),1e-06))
+> Alpha #32: ic=0.0157, test_ic=0.0106, test_icir=0.0711, expr=Div(TsSum(Sub($close,$open),5),TsSum(Add($high,$low),5))
+> Alpha #33: ic=0.0089, test_ic=0.0019, test_icir=0.0206, expr=Sub(TsMean($volume,20),$volume)
+> Alpha #34: ic=0.0088, test_ic=0.0267, test_icir=0.3366, expr=TsIr($volume,20)
+> Alpha #35: ic=0.0223, test_ic=0.0184, test_icir=0.1021, expr=Div(TsMean(TsMaxDiff($close,10),10),$close)
+> Alpha #36: ic=0.0088, test_ic=0.0033, test_icir=0.0324, expr=Div(TsMean(Sub($high,$low),30),Sub(TsMax($high,30),TsMin($low,30)))
+> Alpha #37: ic=0.0123, test_ic=0.0078, test_icir=0.0966, expr=TsCorr(Sub($high,$low),$volume,30)
+> Alpha #38: ic=0.0217, test_ic=-0.0019, test_icir=-0.0076, expr=Div(TsMean(Abs(TsDelta($close,1)),30),$close)
+> Alpha #39: ic=0.0148, test_ic=-0.0181, test_icir=-0.1858, expr=Div(Sub(Less($open,$close),TsMin($low,5)),Add(TsMaxDiff($high,5),0.0001))
+> Alpha #40: ic=0.0093, test_ic=-0.0053, test_icir=-0.0487, expr=Div(Sub(Less($open,$close),TsMean($low,5)),Add(TsMinMaxDiff($high,5),0.0001))
+> Alpha #41: ic=0.0066, test_ic=-0.0070, test_icir=-0.0738, expr=Div(Sub(Less($open,$close),TsMin($low,5)),Add(TsStd($high,5),0.0001))
+> Alpha #42: ic=0.0095, test_ic=-0.0055, test_icir=-0.0488, expr=Div(Sub(Less($open,$close),TsMin($low,5)),Add(TsMean(TsMinMaxDiff($high,5),5),0.0001))
+> Alpha #43: ic=0.0219, test_ic=-0.0251, test_icir=-0.1214, expr=TsStd(Div(Sub($high,$low),$close),30)
+> Alpha #44: ic=0.0205, test_ic=0.0609, test_icir=0.4507, expr=TsMean(TsMaxDiff($close,20),20)
+> Alpha #45: ic=0.0161, test_ic=-0.0019, test_icir=-0.0079, expr=TsMean(TsMad(Div(Sub($close,$vwap),$vwap),30),30)
+> Alpha #46: ic=0.0107, test_ic=-0.0075, test_icir=-0.0684, expr=Div(Sub(TsMax($high,5),$close),Add(TsMinMaxDiff($close,5),0.0001))
+> Alpha #47: ic=0.0093, test_ic=0.0019, test_icir=0.0134, expr=Div($close,$open)
+> Alpha #48: ic=0.0097, test_ic=-0.0055, test_icir=-0.0491, expr=TsMean(Div(Sub($high,$close),Add(Sub($high,$low),0.0001)),5)
+>> Best single ic: 0.0272
+---------------------------------------------
+Pre-calculating daily metrics for each factor...
+  0%|          | 0/49 [00:00<?, ?it/s]

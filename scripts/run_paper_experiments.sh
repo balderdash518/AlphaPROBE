@@ -86,7 +86,10 @@ for job in "${JOBS[@]}"; do
   note "train $name: $args"
   echo "===== $(date '+%F %T') start/resume =====" >> "$train_log"
   # shellcheck disable=SC2086
-  if ! $PY train_new_work.py --config "$CONFIG" --seed 0 --resume $args >> "$train_log" 2>&1; then
+  # The per-iteration pool evaluation (log_freq) is monitoring only - the search never reads its
+  # test metrics - and costs ~50 min per iteration on CSI 300, so by default only the last
+  # iteration is evaluated. LOG_FREQ=1 restores per-iteration curves.
+  if ! $PY train_new_work.py --config "$CONFIG" --seed 0 --resume --log_freq "${LOG_FREQ:-20}" $args >> "$train_log" 2>&1; then
     note "FAILED train $name (see $train_log); start the queue again to resume it"; continue
   fi
   run_dir=$(grep -a '^Log dir: ' "$train_log" | tail -1 | cut -d' ' -f3-)

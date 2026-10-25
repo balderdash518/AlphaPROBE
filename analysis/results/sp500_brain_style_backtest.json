@@ -1,0 +1,512 @@
+[
+ {
+  "sharpe": 0.4155114550295458,
+  "turnover": 0.23754674196243286,
+  "returns": 0.02411458268761635,
+  "fitness": 0.13238791784197962,
+  "days": 1254,
+  "name": "user_brain",
+  "expr": "Rank(TsCorr(Abs(Sub(Div($close,Ref($close,1)),1.0)),Div($volume,TsMean($volume,20)),20))",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.31227824534591736,
+  "turnover": 0.13886559009552002,
+  "returns": 0.06647450476884842,
+  "fitness": 0.21605880796884366,
+  "days": 1254,
+  "name": "pool_0",
+  "expr": "Div(TsMean(TsMinMaxDiff($close,10),10),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 1.6375023652410623,
+  "turnover": 0.3504875898361206,
+  "returns": 0.2251451462507248,
+  "fitness": 1.3124323177114425,
+  "days": 1254,
+  "name": "pool_1",
+  "expr": "Mul(Sign(TsMinDiff($close,10)),TsStd(TsMinDiff($close,10),10))",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.10129829387580826,
+  "turnover": 0.16249585151672363,
+  "returns": 0.020128220319747925,
+  "fitness": 0.03565198179870158,
+  "days": 1254,
+  "name": "pool_2",
+  "expr": "Div(TsMean(TsMaxDiff($high,10),10),$close)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": -0.34228866363699995,
+  "turnover": 0.26462075114250183,
+  "returns": -0.06431405246257782,
+  "fitness": -0.16874600599251954,
+  "days": 1254,
+  "name": "pool_3",
+  "expr": "Div(TsStd(Sub($high,$low),10),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.5105339149438185,
+  "turnover": 0.6356399059295654,
+  "returns": 0.06368473172187805,
+  "fitness": 0.16159825997857574,
+  "days": 1254,
+  "name": "pool_4",
+  "expr": "Div(Sub(TsMax($high,10),$close),Add(TsMinMaxDiff($close,10),0.0001))",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 1.6784840554703866,
+  "turnover": 0.3600379228591919,
+  "returns": 0.23763199150562286,
+  "fitness": 1.3636268308092043,
+  "days": 1254,
+  "name": "pool_5",
+  "expr": "TsMinDiff($close,10)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": -0.16948773761570526,
+  "turnover": 0.0938117504119873,
+  "returns": -0.03289873152971268,
+  "fitness": -0.0869506562059205,
+  "days": 1254,
+  "name": "pool_6",
+  "expr": "Div(TsMean(TsMaxDiff(Sub($high,$low),20),20),$close)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.7945164236671803,
+  "turnover": 0.12718217074871063,
+  "returns": 0.09859870374202728,
+  "fitness": 0.6995606443069025,
+  "days": 1254,
+  "name": "pool_7",
+  "expr": "Div(TsCorr(Sub($high,$low),$volume,20),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.6158360673939326,
+  "turnover": 0.16342079639434814,
+  "returns": 0.06731686741113663,
+  "fitness": 0.3952513981799131,
+  "days": 1254,
+  "name": "pool_8",
+  "expr": "Div(TsSkew(Sub($high,$low),20),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": -0.34562929168025774,
+  "turnover": 0.103975310921669,
+  "returns": -0.0728696957230568,
+  "fitness": -0.2638937033378267,
+  "days": 1254,
+  "name": "pool_9",
+  "expr": "TsStd(Div(Sub($high,$low),$close),30)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.1386985569786177,
+  "turnover": 0.16390663385391235,
+  "returns": 0.03450252488255501,
+  "fitness": 0.0636354501760012,
+  "days": 1254,
+  "name": "pool_10",
+  "expr": "Div(TsMean(GetGreater(Sub($high,$low),GetGreater(Abs(Sub($high,Ref($close,1))),Abs(Sub($low,Ref($close,1))))),10),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 1.258441275447938,
+  "turnover": 0.10115645825862885,
+  "returns": 0.20256641507148743,
+  "fitness": 1.6019969461886343,
+  "days": 1254,
+  "name": "pool_11",
+  "expr": "Sub(TsMean(Greater($close,Ref($close,1)),10),TsMean(Less($close,Ref($close,1)),10))",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 1.2075380272640654,
+  "turnover": 0.004977450706064701,
+  "returns": 0.167804554104805,
+  "fitness": 1.3990965664277937,
+  "days": 1254,
+  "name": "pool_12",
+  "expr": "TsMean(Less($close,Ref($close,1)),10)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.7137487372473645,
+  "turnover": 0.545311689376831,
+  "returns": 0.13519570231437683,
+  "fitness": 0.355389329200509,
+  "days": 1254,
+  "name": "pool_13",
+  "expr": "Div(TsMean($close,10),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.37883255427637946,
+  "turnover": 0.4677388668060303,
+  "returns": 0.0799451395869255,
+  "fitness": 0.15661796756471047,
+  "days": 1254,
+  "name": "pool_14",
+  "expr": "Div(TsMax($high,10),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.20640663170845774,
+  "turnover": 0.10775946825742722,
+  "returns": 0.043304625898599625,
+  "fitness": 0.12148867555608593,
+  "days": 1254,
+  "name": "pool_15",
+  "expr": "TsMean(TsStd(Div($close,$open),10),10)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.5162500527399267,
+  "turnover": 0.3597104549407959,
+  "returns": 0.050222668796777725,
+  "fitness": 0.19290054753409488,
+  "days": 1254,
+  "name": "pool_16",
+  "expr": "Mul(Rank(TsMaxDiff($close,30)),Rank(TsStd(TsMaxDiff($close,30),30)))",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.5682109097170371,
+  "turnover": 0.11929615586996078,
+  "returns": 0.06037091091275215,
+  "fitness": 0.39488300605461557,
+  "days": 1254,
+  "name": "pool_17",
+  "expr": "Div(TsMean(TsSkew(Sub($high,$low),10),10),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.858465859407945,
+  "turnover": 0.061123307794332504,
+  "returns": 0.1575538069009781,
+  "fitness": 0.9637900823753555,
+  "days": 1254,
+  "name": "pool_18",
+  "expr": "Div(TsMean(TsStd(Log($close),10),10),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.49477945289019576,
+  "turnover": 0.07186274975538254,
+  "returns": 0.04967518523335457,
+  "fitness": 0.311907906411355,
+  "days": 1254,
+  "name": "pool_19",
+  "expr": "Rank(TsStd($close,20))",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.6444088911335043,
+  "turnover": 0.3708743453025818,
+  "returns": 0.11863402277231216,
+  "fitness": 0.3644624059529323,
+  "days": 1254,
+  "name": "pool_20",
+  "expr": "Sub(1.0,Div($close,TsMean($close,20)))",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.843172755831198,
+  "turnover": 0.09382662922143936,
+  "returns": 0.18424929678440094,
+  "fitness": 1.0236805664287596,
+  "days": 1254,
+  "name": "pool_21",
+  "expr": "Div(TsCov(Sub($high,$low),$volume,20),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.8046130867233153,
+  "turnover": 0.75874924659729,
+  "returns": 0.15171700716018677,
+  "fitness": 0.35979496474537426,
+  "days": 1254,
+  "name": "pool_22",
+  "expr": "Div(Sub(TsMean($high,5),$close),Add(TsMean($high,5),0.0001))",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.19839032488878697,
+  "turnover": 0.05888885632157326,
+  "returns": 0.04675039276480675,
+  "fitness": 0.12132718247395323,
+  "days": 1254,
+  "name": "pool_23",
+  "expr": "Div(TsMean(TsMinMaxDiff($close,30),30),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.410151086328725,
+  "turnover": 0.6707199215888977,
+  "returns": 0.07852455973625183,
+  "fitness": 0.14033823136557214,
+  "days": 1254,
+  "name": "pool_24",
+  "expr": "Div(Sub(TsMax($high,5),$close),Add(TsMax($high,5),0.0001))",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.4481731691731917,
+  "turnover": 0.12905903160572052,
+  "returns": 0.08035275340080261,
+  "fitness": 0.3536323939015167,
+  "days": 1254,
+  "name": "pool_25",
+  "expr": "Div(TsStd(Log($high),20),TsMean(Log($high),20))",
+  "sign": 1.0
+ },
+ {
+  "sharpe": -0.061365371435775154,
+  "turnover": 0.6494478583335876,
+  "returns": -0.009229384362697601,
+  "fitness": -0.007315391827440714,
+  "days": 1254,
+  "name": "pool_26",
+  "expr": "Div(TsMaxDiff(Sub($high,$low),20),$close)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 1.007490176762369,
+  "turnover": 0.10966856777667999,
+  "returns": 0.16278435289859772,
+  "fitness": 1.1497201122199854,
+  "days": 1254,
+  "name": "pool_27",
+  "expr": "Div(TsCov(Abs(Sub(Div($close,Ref($close,1)),1.0)),$volume,20),Add(TsStd(Abs(Sub(Div($close,Ref($close,1)),1.0)),20),0.0001))",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.4067863894653571,
+  "turnover": 0.33076319098472595,
+  "returns": 0.08447534590959549,
+  "fitness": 0.205576191350778,
+  "days": 1254,
+  "name": "pool_28",
+  "expr": "Div(TsMaxDiff($close,20),$close)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 1.5566092489257837,
+  "turnover": 0.5382559895515442,
+  "returns": 0.2195778340101242,
+  "fitness": 0.9942129278135176,
+  "days": 1254,
+  "name": "pool_29",
+  "expr": "Mul(Sign(TsMinDiff($close,5)),TsStd(TsMinDiff($close,5),5))",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.15670581919853474,
+  "turnover": 0.2775203585624695,
+  "returns": 0.01232404075562954,
+  "fitness": 0.03302282764706531,
+  "days": 1254,
+  "name": "pool_30",
+  "expr": "TsCorr(Sub(Div($vwap,$open),1.0),Sub(Div($close,$vwap),1.0),20)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": -0.04756115280007648,
+  "turnover": 0.13326264917850494,
+  "returns": -0.009643799625337124,
+  "fitness": -0.012794468588802599,
+  "days": 1254,
+  "name": "pool_31",
+  "expr": "Div(TsMean(TsMad(Sub($high,$low),10),10),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": -0.22594366851267814,
+  "turnover": 0.1542256623506546,
+  "returns": -0.04635254666209221,
+  "fitness": -0.12386787014562049,
+  "days": 1254,
+  "name": "pool_32",
+  "expr": "Div(TsStd(Sub($high,$low),20),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 1.066862692767467,
+  "turnover": 0.03957982361316681,
+  "returns": 0.1753072738647461,
+  "fitness": 1.2634367193355256,
+  "days": 1254,
+  "name": "pool_33",
+  "expr": "Div(TsMean(Mul(Sub($high,$low),$volume),20),Add(TsStd(Sub($high,$low),20),0.0001))",
+  "sign": 1.0
+ },
+ {
+  "sharpe": -0.28763165527893925,
+  "turnover": 0.059115856885910034,
+  "returns": -0.049526482820510864,
+  "fitness": -0.18105078073194486,
+  "days": 1254,
+  "name": "pool_34",
+  "expr": "TsMean(TsCov(Div($close,$open),Div($high,$low),30),30)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.2938018481138801,
+  "turnover": 0.2065519243478775,
+  "returns": 0.057512711733579636,
+  "fitness": 0.1550321624653552,
+  "days": 1254,
+  "name": "pool_35",
+  "expr": "TsMean(TsMaxDiff(Div($close,$open),10),10)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.3627158180409531,
+  "turnover": 0.1170266717672348,
+  "returns": 0.06367138773202896,
+  "fitness": 0.25887114283785057,
+  "days": 1254,
+  "name": "pool_36",
+  "expr": "TsMean(TsIr(Div($close,$open),10),10)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 1.1531531385024085,
+  "turnover": 0.05068446323275566,
+  "returns": 0.20221704244613647,
+  "fitness": 1.4666985677694653,
+  "days": 1254,
+  "name": "pool_37",
+  "expr": "TsMean(TsMaxDiff($close,20),20)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.8874829214194246,
+  "turnover": 0.06539218872785568,
+  "returns": 0.11379025876522064,
+  "fitness": 0.8467545550135995,
+  "days": 1254,
+  "name": "pool_38",
+  "expr": "Div(TsIr(Sub($high,$low),20),$close)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.3627158180409531,
+  "turnover": 0.1170266717672348,
+  "returns": 0.06367138773202896,
+  "fitness": 0.25887114283785057,
+  "days": 1254,
+  "name": "pool_39",
+  "expr": "TsMean(TsIr(Div($close,$open),10),10)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.46573385720376986,
+  "turnover": 0.9182208776473999,
+  "returns": 0.08105188608169556,
+  "fitness": 0.13837122583805975,
+  "days": 1254,
+  "name": "pool_40",
+  "expr": "TsMaxDiff(Div($close,$open),30)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 1.0243287706210709,
+  "turnover": 0.264859676361084,
+  "returns": 0.17145685851573944,
+  "fitness": 0.8241549643283945,
+  "days": 1254,
+  "name": "pool_41",
+  "expr": "Mul(Sign(TsMaxDiff($close,20)),TsStd(TsMaxDiff($close,20),20))",
+  "sign": 1.0
+ },
+ {
+  "sharpe": -0.27909683392677515,
+  "turnover": 0.24818666279315948,
+  "returns": -0.05662018433213234,
+  "fitness": -0.13330649838262187,
+  "days": 1254,
+  "name": "pool_42",
+  "expr": "TsStd(Div($high,$close),10)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": 0.6789658622336527,
+  "turnover": 0.345710426568985,
+  "returns": 0.09694863855838776,
+  "fitness": 0.35955269640425547,
+  "days": 1254,
+  "name": "pool_43",
+  "expr": "Div(Sub($close,TsMin($low,20)),Add(TsMax($high,20),0.0001))",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 1.0543362616232212,
+  "turnover": 0.7962594032287598,
+  "returns": 0.16797122359275818,
+  "fitness": 0.48424961852529685,
+  "days": 1254,
+  "name": "pool_44",
+  "expr": "Sub($high,$close)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.8701319041546945,
+  "turnover": 0.007908168248832226,
+  "returns": 0.09222152084112167,
+  "fitness": 0.7473881979898751,
+  "days": 1254,
+  "name": "pool_45",
+  "expr": "Rank(TsMax($high,10))",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.795331688419114,
+  "turnover": 0.10880161821842194,
+  "returns": 0.1512906402349472,
+  "fitness": 0.8749823469599467,
+  "days": 1254,
+  "name": "pool_46",
+  "expr": "Div(TsMean(TsMaxDiff(Log($close),10),10),$close)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.04674917385604797,
+  "turnover": 0.26515495777130127,
+  "returns": 0.002929430454969406,
+  "fitness": 0.004913779405004453,
+  "days": 1254,
+  "name": "pool_47",
+  "expr": "TsCorr(Abs(Sub(Div($close,$open),1.0)),Sub(Div($high,$low),1.0),20)",
+  "sign": 1.0
+ },
+ {
+  "sharpe": -0.5959863281240197,
+  "turnover": 0.7558984160423279,
+  "returns": -0.09143470972776413,
+  "fitness": -0.2072813016222291,
+  "days": 1254,
+  "name": "pool_48",
+  "expr": "TsMaxDiff(Div($high,$close),15)",
+  "sign": -1.0
+ },
+ {
+  "sharpe": 0.06456089169685851,
+  "turnover": 0.09474831074476242,
+  "returns": 0.014493974857032299,
+  "fitness": 0.021984078230775174,
+  "days": 1254,
+  "name": "pool_49",
+  "expr": "TsStd(Div($close,$open),30)",
+  "sign": 1.0
+ }
+]

@@ -749,9 +749,10 @@ class AlphaKnowledgeTrainer:
         rng = state["rng"]
         random.setstate(rng["python"])
         np.random.set_state(rng["numpy"])
-        torch.set_rng_state(rng["torch"])
+        # map_location moved every tensor to the data device; RNG states must be CPU ByteTensors.
+        torch.set_rng_state(rng["torch"].cpu())
         if rng["cuda"] is not None and torch.cuda.is_available():
-            torch.cuda.set_rng_state_all(rng["cuda"])
+            torch.cuda.set_rng_state_all([s.cpu() for s in rng["cuda"]])
         return state["iteration"]
 
     def train(self, args: Any):

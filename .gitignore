@@ -219,3 +219,9 @@ run.sh
 run_grid_search.sh
 grid_search_config.py
 models/
+
+# Experiment records stay in git so runs can be reviewed on other machines
+# (checkpoints, raw data and models are still excluded: see analysis/README.md).
+!logs/
+!logs/**/*.log
+!data/knowledge_logs/**/ret_s.npy

@@ -1,0 +1,47 @@
+[2026-10-24 20:31:49] train main_sp500: --instruments sp500
+[2026-10-24 22:39:57] FAILED train main_sp500 (see logs/paper/main_sp500.train.log)
+[2026-10-24 22:39:57] skip main_csi300 (done)
+[2026-10-24 22:39:57] skip main_csi500 (done)
+[2026-10-24 22:39:57] skip main_csi1000 (done)
+[2026-10-24 22:39:57] skip sens_omega0.00_csi300 (done)
+[2026-10-24 22:39:57] skip sens_omega0.05_csi300 (done)
+[2026-10-24 22:39:57] skip sens_omega0.15_csi300 (done)
+[2026-10-24 22:39:57] skip sens_omega0.20_csi300 (done)
+[2026-10-24 22:39:57] skip sens_gamma0.00_csi300 (done)
+[2026-10-24 22:39:57] skip sens_gamma0.10_csi300 (done)
+[2026-10-24 22:39:57] skip sens_gamma0.15_csi300 (done)
+[2026-10-24 22:39:57] skip sens_gamma0.20_csi300 (done)
+[2026-10-24 22:39:57] skip abl_no_topology_csi300 (done)
+[2026-10-24 22:39:57] skip abl_no_topology_csi500 (done)
+[2026-10-24 22:39:58] skip abl_no_topology_csi1000 (done)
+[2026-10-24 22:39:58] skip abl_no_nlf_csi300 (done)
+[2026-10-24 22:39:58] skip abl_no_nlf_csi500 (done)
+[2026-10-24 22:39:58] skip abl_no_nlf_csi1000 (done)
+[2026-10-24 22:39:58] queue finished
+[2026-10-24 22:42:10] train main_sp500: --instruments sp500
+[2026-10-24 23:42:21] train main_sp500: --instruments sp500
+[2026-10-24 23:49:52] FAILED train main_sp500 (see logs/paper/main_sp500.train.log)
+[2026-10-24 23:49:59] train main_sp500: --instruments sp500
+[2026-10-25 04:16:26] combine main_sp500: data/knowledge_logs\pool_50\kg_dag_and_bayesian_icir_and_mutl_new_no_decay_deepseek-flash_5_sp500_seed0_0.5_7_40_0.9_50_20_0.006_True_True_True_True_0.7_0.1_0.05/pool_20.json
+[2026-10-25 04:19:30] done main_sp500
+[2026-10-25 04:19:30] queue finished
+[2026-10-25 08:03:21] train main_csi300: --instruments csi300
+[2026-10-25 09:07:11] train main_csi300: --instruments csi300
+[2026-10-25 09:08:15] FAILED train main_csi300 (see logs/paper/main_csi300.train.log); start the queue again to resume it
+[2026-10-25 09:08:15] queue finished
+[2026-10-25 09:09:16] train main_csi300: --instruments csi300
+[2026-10-25 09:10:17] FAILED train main_csi300 (see logs/paper/main_csi300.train.log); start the queue again to resume it
+[2026-10-25 09:10:17] queue finished
+[2026-10-25 09:11:18] train main_csi300: --instruments csi300
+[2026-10-25 09:12:20] FAILED train main_csi300 (see logs/paper/main_csi300.train.log); start the queue again to resume it
+[2026-10-25 09:12:20] queue finished
+[2026-10-25 09:13:21] train main_csi300: --instruments csi300
+[2026-10-25 09:14:22] FAILED train main_csi300 (see logs/paper/main_csi300.train.log); start the queue again to resume it
+[2026-10-25 09:14:22] queue finished
+[2026-10-25 09:15:23] train main_csi300: --instruments csi300
+[2026-10-25 09:16:25] FAILED train main_csi300 (see logs/paper/main_csi300.train.log); start the queue again to resume it
+[2026-10-25 09:16:25] queue finished
+[2026-10-25 09:18:27] train main_csi300: --instruments csi300
+[2026-10-25 12:03:41] combine main_csi300: data/knowledge_logs\pool_50\kg_dag_and_bayesian_icir_and_mutl_new_no_decay_deepseek-flash_5_csi300_seed0_0.5_7_40_0.9_50_20_0.006_True_True_True_True_0.7_0.1_0.05/pool_20.json
+[2026-10-25 12:10:48] done main_csi300
+[2026-10-25 12:10:48] queue finished

@@ -1,0 +1,15 @@
+[2026-10-24 23:58:42] watchdog started for: main_sp500 (pid 669)
+[2026-10-24 23:59:47] watchdog started for: main_sp500 (pid 704)
+[2026-10-25 04:20:33] all done: main_sp500
+[2026-10-25 08:03:20] watchdog started for: main_csi300 (pid 1697)
+[2026-10-25 08:03:21] attempt 1: running queue for main_csi300
+[2026-10-25 09:07:11] watchdog started for: main_csi300 (pid 947)
+[2026-10-25 09:07:11] attempt 1: running queue for main_csi300
+[2026-10-25 09:09:15] attempt 2: running queue for main_csi300
+[2026-10-25 09:11:18] attempt 3: running queue for main_csi300
+[2026-10-25 09:13:20] attempt 4: running queue for main_csi300
+[2026-10-25 09:15:23] attempt 5: running queue for main_csi300
+[2026-10-25 09:17:25] giving up after 5 attempts
+[2026-10-25 09:18:26] watchdog started for: main_csi300 (pid 1238)
+[2026-10-25 09:18:26] attempt 1: running queue for main_csi300
+[2026-10-25 12:11:48] all done: main_csi300
