@@ -19,6 +19,7 @@
 | `sp500_factor_metrics.json`、`csi300_factor_metrics.json` | 最终 50 个入库因子在训练/验证/测试期的 IC、ICIR、RankIC，量纲、谱系深度、父因子、解释文字，以及测试期两两相关矩阵 |
 | `sp500_factor_table.md`、`csi300_factor_table.md` | 上面结果整理成的逐因子表 |
 | `sp500_brain_style_backtest.json` | 仿 WorldQuant BRAIN 口径（delay 1、市场中性、8% 截断）的日频多空回测：夏普、换手率、Fitness |
+| `paper_appendix_vs_csi300.json` | 论文附录 Table 4 的 28 个因子与本次 csi300 的 50 个因子，在同一份数据（`cn_data_2024`）、同样三个区间上的 IC/ICIR/RankIC，以及每个论文因子与本次因子池的最高测试期相关 |
 
 ## scripts/ — 生成上述结果的脚本
 
@@ -39,5 +40,6 @@ python analysis/scripts/factor_metrics.py <运行的 log 目录> out.json csi300
 | `factor_metrics.py` | 从 `checkpoint.pt` 读取因子池，在三个区间计算逐因子指标（需要 qlib 数据和检查点） |
 | `signif.py` | 训练期显著性（按 20 日重叠换算的 t 统计量）与样本外方向保持 |
 | `wq_sim.py` | 仿 BRAIN 的日频多空回测 |
+| `paper_vs_mine.py` | 不依赖 qlib、直接读 `.bin` 文件，在 CPU 上评估论文附录因子和本次因子池：`python -I analysis/scripts/paper_vs_mine.py <仓库根目录> <qlib 数据目录> out.json` |
 
 运行日志在仓库根目录的 `logs/`，每次运行的因子池与指标在 `data/knowledge_logs/`（`checkpoint.pt` 超过 GitHub 单文件 100 MB 上限，不在仓库里）。
